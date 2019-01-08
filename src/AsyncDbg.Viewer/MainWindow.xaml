@@ -1,0 +1,17 @@
+﻿<Window x:Class="AsyncCausalityViewer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:c="clr-namespace:AsyncCausalityViewer"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="350" Width="525">
+  <Grid>
+    <DockPanel>
+      <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
+        <Button Margin="3" Padding="15, 3" Content="Initialize" Click="OnClickInitialize" />
+      </StackPanel>
+      <c:GraphViewerControl x:Name="ViewerControl" />
+    </DockPanel>
+  </Grid>
+</Window>

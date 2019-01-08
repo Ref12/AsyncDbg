@@ -1,0 +1,316 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using AsyncDbgCore;
+using AsyncDbgCore.Core;
+using Microsoft.Diagnostics.Runtime;
+
+#nullable enable
+
+namespace AsyncCausalityDebuggerNew
+{
+    //public class ClrObjectInstance : ClrInstance
+    //{
+
+    //}
+
+    //public class ClrValueInstance : ClrInstance
+    //{
+
+    //}
+
+    /// <todoc />
+    [DebuggerTypeProxy(typeof(ClrInstanceDynamicProxy))]
+    public class ClrInstance
+    {
+        private ClrFieldValue[]? _fields;
+        private ClrInstance[]? _items;
+
+        private readonly ClrType? _primitiveTypeOptional;
+        private readonly ClrType? _originalType;
+
+        private readonly bool _interior; // True if the instance is embedded in another instance (like a struct in an array).
+
+        public ClrHeap Heap { get; } // NotNull
+
+        public object? ValueOrDefault { get; } // Null if instance is null.
+
+        public object Value
+        {
+            get
+            {
+                var result = ValueOrDefault;
+                Contract.AssertNotNull(result);
+                return result;
+            }
+        }
+
+        public ClrType? Type => _primitiveTypeOptional ?? _originalType; // (null if IsNull is true)
+
+        public ulong? ObjectAddress => IsObject ? (ulong?)ValueOrDefault : null;
+        public ulong AddressWithoutHeader => _interior ? ObjectAddress.Value : ObjectAddress.Value + (ulong)Heap.PointerSize;
+
+        public bool IsNull => ValueOrDefault == null;
+
+        public bool IsObject => IsNull || Type is null || !Type.IsIntrinsic();
+
+        public bool IsObjectRefernece => IsNull || Type?.IsObjectReference == true;
+
+        public bool IsArray => Type?.IsArray == true;
+
+        public ClrFieldValue? this[string fieldName] => TryGetFieldValue(fieldName);
+
+        public ClrFieldValue GetField(string fieldName)
+        {
+            return Contract.AssertNotNull(TryGetFieldValue(fieldName), $"The field '{fieldName}' is not found.");
+        }
+
+        public ClrFieldValue[] Fields => _fields = _fields ?? ComputeFields();
+
+        public ClrInstance[] Items => _items = _items ?? ComputeItems();
+
+        private ClrInstance(ClrHeap heap, object? value, ClrType? type, bool interior)
+        {
+            if (value != null && type == null)
+            {
+                throw new ArgumentNullException(nameof(type), $"Non null value must have a type.");
+            }
+
+            Heap = heap;
+            ValueOrDefault = value;
+            _originalType = type;
+            _interior = interior;
+            (ValueOrDefault, _primitiveTypeOptional) = InitializeCore(type);
+        }
+
+        public static ClrInstance CreateInstance(ClrHeap heap, object? value, ClrType? type)
+        {
+            if (value is ulong address && address == 0)
+            {
+                // this is null.
+                return new ClrInstance(heap, null, type, interior: false);
+            }
+
+            return new ClrInstance(heap, value, type, interior: false);
+        }
+
+        public static ClrInstance CreateInterior(ClrHeap heap, object value, ClrType type)
+        {
+            if (value is ulong address && address == 0)
+            {
+                // this is null.
+                return new ClrInstance(heap, null, type, interior: false);
+            }
+
+            return new ClrInstance(heap, value, type, interior: true);
+        }
+
+        public static ClrInstance CreateInstance(ClrHeap heap, ulong address, ClrType? type = null)
+        {
+            type = type ?? heap.GetObjectType(address);
+
+            if (address == 0)
+            {
+                // this is null.
+                return CreateInstance(heap, null, type);
+            }
+
+            if (type == null)
+            {
+                throw new InvalidOperationException($"It seems that address '{address}' does not points to a valid managed object.");
+            }
+            
+            return new ClrInstance(heap, address, type, interior: false);
+        }
+
+        private (object? value, ClrType? primitiveTypeOptional) InitializeCore(ClrType? originalType)
+        {
+            var value = ValueOrDefault;
+            var type = originalType;
+
+            if (type?.IsEnum == true)
+            {
+                var info = ClrEnumTypeInfo.GetOrCreateEnumTypeInfo(type);
+                if (info.ValuesByValue.TryGetValue(ValueOrDefault, out var e))
+                {
+                    value = e;
+                }
+                else
+                {
+                    var values = new List<ClrEnumValue>();
+                    long bits = Convert.ToInt64(ValueOrDefault);
+                    foreach (var enumValue in info.ValuesByValue.Values)
+                    {
+                        if ((enumValue.Value & bits) == enumValue.Value)
+                        {
+                            values.Add(enumValue);
+                        }
+                    }
+
+                    value = new ClrEnumValue(bits, values);
+                }
+            }
+
+            bool isObject = IsObject;
+
+            ClrType? primitiveTypeOptional = null;
+            if (!isObject || type?.IsValueClass == true)
+            {
+                Contract.NotNull(type);
+
+                primitiveTypeOptional = type;
+                if (!isObject)
+                {
+                    if (value is ulong address)
+                    {
+                        value = type.GetValue(address);
+                    }
+                }
+            }
+
+            return (value, primitiveTypeOptional);
+        }
+
+        public bool IsOfType(ClrType type)
+        {
+            // What about subtyping?
+            return ClrTypeEqualityComparer.Instance.Equals(Type, type);
+        }
+
+        private ClrFieldValue? TryGetFieldValue(string fieldName)
+        {
+            var propertyName = $"<{fieldName}>k__BackingField";
+            foreach (var field in Fields)
+            {
+                if (field.Field.Name == fieldName || field.Field.Name == propertyName)
+                {
+                    return field;
+                }
+            }
+
+            return null;
+        }
+
+        public bool TryGetFieldValue(string fieldName, [NotNullWhenTrue]out ClrFieldValue? fieldValue)
+        {
+            fieldValue = this[fieldName];
+            return fieldValue != null;
+        }
+
+        /// <inheritdoc />
+        public override string ToString()
+        {
+            //return IsObject ? $"{Type?.Name} ({Value ?? "null"})" : Value.ToString();
+            // For some weird reason String is not an object!
+            if (Type?.IsString == true)
+            {
+                return $"\"{ValueOrDefault}\"";
+            }
+
+            if (IsNull)
+            {
+                return "null";
+            }
+
+            if (IsObject)
+            {
+                return $"{Type?.Name} ({ValueOrDefault})";
+            }
+
+            if (ValueOrDefault == null)
+            {
+                return "<NO VALUE>";
+            }
+
+            string suffix = string.Empty;
+            if (Type.IsOfTypes(typeof(long), typeof(ulong)))
+            {
+                suffix = "L";
+            }
+            else if (Type.IsOfTypes(typeof(double), typeof(float)))
+            {
+                suffix = "f";
+            }
+
+            return $"{ValueOrDefault}{suffix}";
+        }
+
+        private ClrInstance[] ComputeItems()
+        {
+            if (!IsArray)
+            {
+                return Array.Empty<ClrInstance>();
+            }
+
+            var address = ObjectAddress.Value;
+            var length = Type.GetArrayLength(address);
+            var items = new ClrInstance[length];
+            var elementType = Type.ComponentType;
+            for (int i = 0; i < length; i++)
+            {
+                var tmp = GetElementAt(i);
+                if (!(tmp is ClrInstance))
+                {
+                    tmp = CreateInterior(Heap, tmp, elementType);
+                }
+                items[i] = (ClrInstance)tmp;
+                //var value = Type.GetArrayElementValue(address, i);
+                //items[i] = CreateItemInstance(value, elementType, i);
+            }
+
+            return items;
+        }
+
+        private object GetElementAt(int index)
+        {
+            if (Type.ComponentType.HasSimpleValue)
+            {
+                var result = Type.GetArrayElementValue(ObjectAddress.Value, index);
+
+                if (IsReference(result, Type.ComponentType))
+                {
+                    var address = (ulong)result;
+                    return CreateInterior(Heap, address, Heap.GetObjectType(address));
+                }
+
+                return Type.GetArrayElementValue(ObjectAddress.Value, index);
+            }
+
+            return CreateInterior(Heap, Type.GetArrayElementAddress(ObjectAddress.Value, index), Type.ComponentType);
+        }
+
+        private static bool IsReference(object result, ClrType type)
+        {
+            return result != null && !(result is string) && type.IsObjectReference;
+        }
+
+        private ClrFieldValue[] ComputeFields()
+        {
+            if (IsNull || Type?.IsStringOrPrimitive() == true)
+            {
+                return Array.Empty<ClrFieldValue>();
+            }
+
+            var offsets = new HashSet<int>();
+            var fields = new List<ClrFieldValue>();
+
+            foreach (var typeField in Type.EnumerateBaseTypesAndSelf().SelectMany(t => t.Fields))
+            {
+                if (typeField.Name == "<>u__1")
+                {
+                    // TODO: what this is all about?
+                    continue;
+                }
+
+                if (offsets.Add(typeField.Offset))
+                {
+                    fields.Add(ClrFieldValue.Create(typeField, this, _interior));
+                }
+            }
+
+            return fields.Where(f => f != null).ToArray();
+        }
+    }
+}
