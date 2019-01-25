@@ -21,7 +21,7 @@ namespace AsyncCausalityDebugger
 
         static void DoCoreStuff()
         {
-            string path = @"F:\Sources\AsyncDbg\SampleDumps\BasicDatastructures (3).DMP";
+            string path = @"F:\Sources\GitHub\AsyncDbg\src\SampleDumps\BasicDatastructures (3).DMP";
             EntryPoint.DoStuff(path);
         }
 

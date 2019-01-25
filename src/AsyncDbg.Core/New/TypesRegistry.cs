@@ -78,11 +78,11 @@ namespace AsyncCausalityDebuggerNew
             return _typeIndices.SelectMany(index => index.Instances.Select(i => (i, index.Kind)));
         }
 
-        public bool IsTask(ClrType type) => TaskIndex.ContainsType(type);
+        public bool IsTask(ClrType? type) => type != null && TaskIndex.ContainsType(type);
 
-        public bool IsTaskCompletionSource(ClrType type) => TaskCompletionSourceIndex.ContainsType(type);
+        public bool IsTaskCompletionSource(ClrType? type) => type != null && (TaskCompletionSourceIndex.ContainsType(type) || type.Name.Contains("TaskSourceSlim"));
 
-        public bool IsSemaphoreWrapper(ClrType type) => SemaphoreWrapperIndex.ContainsType(type);
+        public bool IsSemaphoreWrapper(ClrType? type) => type != null && SemaphoreWrapperIndex.ContainsType(type);
 
         /// <summary>
         /// Returns true if a given <paramref name="continuation"/> is a special Task.s_taskCompletionSentinel instance.

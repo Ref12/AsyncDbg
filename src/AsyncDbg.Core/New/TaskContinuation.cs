@@ -39,6 +39,11 @@ namespace AsyncDbgCore.New
 
         private IEnumerable<ClrInstance> GetContinuationsCore(ClrInstance continuation)
         {
+            if (continuation.Type == null)
+            {
+                yield break;
+            }
+
             //
             // The current task is completed and it is an end of an async stack trace.
             //
@@ -85,6 +90,7 @@ namespace AsyncDbgCore.New
             //
             // The most complicated case: a continuation is System.Action
             //
+            Contract.AssertNotNull(_continuation.Type, "C# compiler should've detected that _continuation.Type is not nullable here!");
             if (_typesRegistry.IsInstanceOfType(_continuation.Type, typeof(Action)))
             {
                 // This is a simple continuation created by async/await

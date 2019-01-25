@@ -15,10 +15,12 @@ namespace AsyncDbgCore
             }
         }
 
-        [Conditional("Unknown")]
-        public static void NotNull([EnsuresNotNull]object? o)
+        public static void Requires(bool predicate, string message)
         {
-            
+            if (!predicate)
+            {
+                throw new System.Exception(message);
+            }
         }
 
         public static T AssertNotNull<T>([EnsuresNotNull]T? value, string message) where T : class

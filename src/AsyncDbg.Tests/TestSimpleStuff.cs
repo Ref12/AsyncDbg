@@ -21,7 +21,7 @@ namespace Test.AsyncCausalityInspector
         [Test]
         public void AwaitForTaskDelay()
         {
-            string path = @"F:\Sources\AsyncDbg\SampleDumps\BasicDatastructures_await_for_TaskDelay.DMP";
+            string path = @"F:\Sources\GitHub\AsyncDbg\src\SampleDumps\BasicDatastructures_await_for_TaskDelay.DMP";
 
             var contextNew = AsyncCausalityDebuggerNew.CausalityContext.LoadCausalityContextFromDump(path);
             var newContent = contextNew.SaveDgml(path + ".dgml", whatIf: false);
@@ -38,7 +38,7 @@ namespace Test.AsyncCausalityInspector
         [Test]
         public void TaskSourceSlim()
         {
-            string path = @"F:\Sources\AsyncDbg\SampleDumps\BasicDatastructures_TaskSourceSlim.DMP";
+            string path = @"F:\Sources\GitHub\AsyncDbg\src\SampleDumps\BasicDatastructures_TaskSourceSlim.DMP";
 
             var contextNew = AsyncCausalityDebuggerNew.CausalityContext.LoadCausalityContextFromDump(path);
             var newContent = contextNew.SaveDgml(path + ".dgml", whatIf: false);
@@ -55,7 +55,7 @@ namespace Test.AsyncCausalityInspector
         [Test]
         public void TaskSourceSlimValueTasks()
         {
-            string path = @"F:\Sources\AsyncDbg\SampleDumps\BasicDatastructures_TaskSourceSlimValueTask.DMP";
+            string path = @"F:\Sources\GitHub\AsyncDbg\src\SampleDumps\BasicDatastructures_TaskSourceSlimValueTask.DMP";
 
             var contextNew = AsyncCausalityDebuggerNew.CausalityContext.LoadCausalityContextFromDump(path);
             var newContent = contextNew.SaveDgml(path + ".dgml", whatIf: false);
@@ -72,8 +72,19 @@ namespace Test.AsyncCausalityInspector
         [Test]
         public void CheckTheDump()
         {
-            string path = @"E:\Dumps\xunit.console.DMP";
+            string path = @"C:\Users\seteplia\AppData\Local\Temp\xunit.console (8).DMP";
 
+            var contextNew = AsyncCausalityDebuggerNew.CausalityContext.LoadCausalityContextFromDump(path);
+            var newContent = contextNew.SaveDgml(path + ".dgml", whatIf: false);
+        }
+
+        [Test]
+        public void AwaitForCompletedTask()
+        {
+            string path = @"F:\Sources\GitHub\AsyncDbg\src\SampleDumps\AwaitForCompletedTask.dmp";
+
+            //var context = CausalityContext.LoadCausalityContextFromDump(path);
+            //var oldContent = context.SaveDgml(path + ".dgml", whatIf: false);
             var contextNew = AsyncCausalityDebuggerNew.CausalityContext.LoadCausalityContextFromDump(path);
             var newContent = contextNew.SaveDgml(path + ".dgml", whatIf: false);
         }
@@ -81,7 +92,7 @@ namespace Test.AsyncCausalityInspector
         [Test]
         public void CompareOldAndNew()
         {
-            string path = @"F:\Sources\AsyncDbg\SampleDumps\BasicDatastructures (3).DMP";
+            string path = @"F:\Sources\GitHub\AsyncDbg\src\SampleDumps\BasicDatastructures (3).DMP";
 
             var context = CausalityContext.LoadCausalityContextFromDump(path);
             var oldContent = context.SaveDgml(path + ".dgml", whatIf: true);
@@ -101,7 +112,7 @@ namespace Test.AsyncCausalityInspector
             var newContent = contextNew.SaveDgml(path + ".dgml", whatIf: true);
 
             var context = CausalityContext.LoadCausalityContextFromDump(path);
-            var oldContent = context.SaveDgml(path + ".dgml", whatIf: true);
+            var oldContent = context.SaveDgml(path + ".dgml", whatIf: false);
 
             Assert.That(newContent, Is.EqualTo(oldContent));
         }

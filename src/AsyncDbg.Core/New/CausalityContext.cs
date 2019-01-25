@@ -133,7 +133,7 @@ namespace AsyncCausalityDebuggerNew
                 return false;
             }
 
-            return node.Dependencies.All(n => n.IsComplete || n.Kind == NodeKind.TaskCompletionSource);
+            return node.Dependencies.All(n => n.IsComplete || n.Kind == NodeKind.TaskCompletionSource || n.Kind == NodeKind.AwaitTaskContinuation);
         }
     }
 }

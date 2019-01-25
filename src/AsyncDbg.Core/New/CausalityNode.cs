@@ -9,14 +9,30 @@ using Microsoft.Diagnostics.Runtime;
 
 namespace AsyncCausalityDebuggerNew
 {
+    public readonly struct TaskInstance
+    {
+        private readonly ClrInstance _instance;
+
+        public TaskInstance(ClrInstance instance)
+        {
+            _instance = instance;
+        }
+
+        public TaskStatus Status => TaskInstanceHelpers.GetStatus(m_stateFlags);
+
+        public bool IsCanceled => (bool)(_instance[nameof(IsCanceled)].Instance.Value);
+
+        private int m_stateFlags => (int)(_instance[nameof(m_stateFlags)].Instance.Value);
+    }
+
     public class CausalityNode
     {
         public CausalityContext Context { get; }
         public ClrInstance TaskInstance { get; }
 
-        public CausalityNode CompletionSourceTaskNode;
-        public ClrThread Thread;
-        public ClrInstance TargetInstance { get; private set; }
+        public CausalityNode? CompletionSourceTaskNode;
+        public ClrThread? Thread;
+        public ClrInstance? TargetInstance { get; private set; }
         public readonly HashSet<CausalityNode> Dependencies = new HashSet<CausalityNode>();
         public readonly HashSet<CausalityNode> Dependents = new HashSet<CausalityNode>();
 
@@ -24,21 +40,6 @@ namespace AsyncCausalityDebuggerNew
 
         private bool IsTask => Kind == NodeKind.Task;
         public NodeKind Kind { get; }
-
-        private string _displayString;
-
-        private string DisplayString
-        {
-            get
-            {
-                if (_displayString == null)
-                {
-                    _displayString = ToString();
-                }
-
-                return _displayString;
-            }
-        }
 
         private bool ProcessingContinuations { get; set; }
         public bool IsComplete
@@ -51,7 +52,7 @@ namespace AsyncCausalityDebuggerNew
                         var status = Status;
                         return (status == TaskStatus.RanToCompletion || status == TaskStatus.Canceled || status == TaskStatus.Faulted) && !ProcessingContinuations;
                     case NodeKind.TaskCompletionSource:
-                        return CompletionSourceTaskNode.IsComplete;
+                        return CompletionSourceTaskNode?.IsComplete == true;
                     default:
                         return false;
                 }
@@ -80,13 +81,19 @@ namespace AsyncCausalityDebuggerNew
             return IsTask ? (int)(TaskInstance["m_stateFlags"].Instance.ValueOrDefault) : 0;
         }
 
+        private readonly TaskInstance _taskInstance;
+
         public CausalityNode(CausalityContext context, ClrInstance task, NodeKind kind)
         {
-            
             Context = context;
             TaskInstance = task;
-            Id = task.ValueOrDefault.ToString();
+            Id = task.ValueOrDefault?.ToString() ?? string.Empty;
             Kind = kind;
+
+            if (kind == NodeKind.Task)
+            {
+                _taskInstance = new TaskInstance(task);
+            }
 
             if (TaskInstance.ObjectAddress == 2461822515200L || TaskInstance.ObjectAddress == 2461822516072L)
             {
@@ -96,7 +103,7 @@ namespace AsyncCausalityDebuggerNew
 
         public void Link()
         {
-            if (TaskInstance.ObjectAddress == 2461822515200L || TaskInstance.ObjectAddress == 2461822516072L)
+            if (TaskInstance.ObjectAddress == 2427805496392L)
             {
 
             }
@@ -214,7 +221,7 @@ namespace AsyncCausalityDebuggerNew
             }
         }
 
-        private ClrStackFrame GetStackFrame(ClrRoot so, List<ulong> stackTraceAddresses, ClrThread clrThread)
+        private ClrStackFrame? GetStackFrame(ClrRoot so, List<ulong> stackTraceAddresses, ClrThread clrThread)
         {
             if (so.StackFrame != null)
             {
@@ -235,10 +242,9 @@ namespace AsyncCausalityDebuggerNew
             return null;
         }
 
-        private void ProcessContinuation(ClrInstance nextContinuation, bool isCurrentNode = false)
+        private void ProcessContinuation(ClrInstance? nextContinuation, bool isCurrentNode = false)
         {
             bool nextIsCurrentNode = isCurrentNode;
-
             while (nextContinuation != null)
             {
                 var continuation = nextContinuation;
@@ -310,7 +316,7 @@ namespace AsyncCausalityDebuggerNew
                         break;
                     }
                     // Need to compare by name since GetTypeByName does not work for the generic type during initialization
-                    else if (continuation.Type.Name == "System.Collections.Generic.List<System.Object>")
+                    else if (continuation.Type?.Name == "System.Collections.Generic.List<System.Object>")
                     {
                         var size = (int)continuation["_size"].Instance.ValueOrDefault;
                         var items = continuation["_items"].Instance.Items;

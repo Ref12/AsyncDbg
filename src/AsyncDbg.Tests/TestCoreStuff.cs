@@ -14,7 +14,7 @@ namespace Test.AsyncCausalityInspector
         [Test]
         public void LookAtArraysAtRuntime()
         {
-            string path = @"F:\Sources\AsyncDbg\SampleDumps\BasicDatastructures.DMP";
+            string path = @"F:\Sources\GitHub\AsyncDbg\src\SampleDumps\BasicDatastructures.DMP";
             AsyncDbgCore.New.EntryPoint.DoStuff(path);
         }
     }

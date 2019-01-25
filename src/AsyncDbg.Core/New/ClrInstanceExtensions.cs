@@ -72,20 +72,20 @@ namespace AsyncDbgCore.New
         /// </remarks>
         public static bool IsCompletedTaskContinuation(this ClrInstance continuation, CausalityContext context)
         {
-            if (!continuation.IsTaskLike(context.Registry))
-            {
-                return false;
-            }
+            //if (!continuation.IsTaskLike(context.Registry))
+            //{
+            //    return false;
+            //}
 
             return context.Registry.IsTaskCompletionSentinel(continuation);
         }
 
         public static bool IsCompletedTaskContinuation(this ClrInstance continuation, TypesRegistry registry)
         {
-            if (!continuation.IsTaskLike(registry))
-            {
-                return false;
-            }
+            //if (!continuation.IsTaskLike(registry))
+            //{
+            //    return false;
+            //}
 
             return registry.IsTaskCompletionSentinel(continuation);
         }
@@ -93,7 +93,7 @@ namespace AsyncDbgCore.New
         public static bool IsListOfObjects(this ClrInstance instance)
         {
             // Need to compare by name since GetTypeByName does not work for the generic type during initialization
-            return instance.Type.Name == "System.Collections.Generic.List<System.Object>";
+            return instance.Type?.Name == "System.Collections.Generic.List<System.Object>";
         }
 
         public static IEnumerable<ClrInstance> EnumerateListOfObjects(this ClrInstance instance)

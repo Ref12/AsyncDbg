@@ -42,7 +42,7 @@ namespace AsyncCausalityDebuggerNew
             return _derivedTypesAndRoot.Where(type => type.Name == fullName).ToList();
         }
 
-        public bool ContainsType(ClrType type)
+        public bool ContainsType(ClrType? type)
         {
             return type != null && _derivedTypesAndRoot.Contains(type);
         }

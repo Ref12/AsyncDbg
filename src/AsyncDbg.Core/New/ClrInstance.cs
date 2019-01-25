@@ -60,7 +60,7 @@ namespace AsyncCausalityDebuggerNew
 
         public bool IsArray => Type?.IsArray == true;
 
-        public ClrFieldValue? this[string fieldName] => TryGetFieldValue(fieldName);
+        public ClrFieldValue this[string fieldName] => GetField(fieldName);
 
         public ClrFieldValue GetField(string fieldName)
         {
@@ -158,7 +158,7 @@ namespace AsyncCausalityDebuggerNew
             ClrType? primitiveTypeOptional = null;
             if (!isObject || type?.IsValueClass == true)
             {
-                Contract.NotNull(type);
+                Contract.AssertNotNull(type);
 
                 primitiveTypeOptional = type;
                 if (!isObject)
@@ -195,7 +195,7 @@ namespace AsyncCausalityDebuggerNew
 
         public bool TryGetFieldValue(string fieldName, [NotNullWhenTrue]out ClrFieldValue? fieldValue)
         {
-            fieldValue = this[fieldName];
+            fieldValue = TryGetFieldValue(fieldName);
             return fieldValue != null;
         }
 
@@ -224,6 +224,8 @@ namespace AsyncCausalityDebuggerNew
                 return "<NO VALUE>";
             }
 
+            Contract.AssertNotNull(Type);
+
             string suffix = string.Empty;
             if (Type.IsOfTypes(typeof(long), typeof(ulong)))
             {
@@ -243,6 +245,8 @@ namespace AsyncCausalityDebuggerNew
             {
                 return Array.Empty<ClrInstance>();
             }
+
+            Contract.AssertNotNull(Type, "Arrays should always have Type != null.");
 
             var address = ObjectAddress.Value;
             var length = Type.GetArrayLength(address);
@@ -265,6 +269,9 @@ namespace AsyncCausalityDebuggerNew
 
         private object GetElementAt(int index)
         {
+            Contract.Requires(!IsNull, "!IsNull");
+            Contract.AssertNotNull(Type);
+
             if (Type.ComponentType.HasSimpleValue)
             {
                 var result = Type.GetArrayElementValue(ObjectAddress.Value, index);
@@ -296,6 +303,7 @@ namespace AsyncCausalityDebuggerNew
             var offsets = new HashSet<int>();
             var fields = new List<ClrFieldValue>();
 
+            Contract.AssertNotNull(Type);
             foreach (var typeField in Type.EnumerateBaseTypesAndSelf().SelectMany(t => t.Fields))
             {
                 if (typeField.Name == "<>u__1")
