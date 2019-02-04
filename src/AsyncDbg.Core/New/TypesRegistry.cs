@@ -37,6 +37,8 @@ namespace AsyncCausalityDebuggerNew
         public ClrType ContinuationWrapperType { get; }
         public ClrType AsyncTaskMethodBuilderType { get; }
         public ClrType StandardTaskContinuationType { get; }
+        public ClrType IAsyncStateMachineType { get; }
+        public TypeIndex IAsyncStateMachineTypeIndex { get; }
 
         private TypesRegistry(ClrHeap heap)
         {
@@ -46,17 +48,20 @@ namespace AsyncCausalityDebuggerNew
 
             StandardTaskContinuationType =
                 GetClrTypeByFullName("System.Threading.Tasks.StandardTaskContinuation"); // This is ContinueWith continuation
+            IAsyncStateMachineType =
+                GetClrTypeByFullName("System.Runtime.CompilerServices.IAsyncStateMachine");
 
-            TaskIndex = CreatTypeIndex(NodeKind.Task);
-            ValueTaskIndex = CreatTypeIndex(NodeKind.ValueTask);
-            ManualResetEventSlimIndex = CreatTypeIndex(NodeKind.ManualResetEventSlim);
-            ManualResetEventIndex = CreatTypeIndex(NodeKind.ManualResetEvent);
-            AwaitTaskContinuationIndex = CreatTypeIndex(NodeKind.AwaitTaskContinuation);
+            TaskIndex = CreateTypeIndex(NodeKind.Task);
+            ValueTaskIndex = CreateTypeIndex(NodeKind.ValueTask);
+            ManualResetEventSlimIndex = CreateTypeIndex(NodeKind.ManualResetEventSlim);
+            ManualResetEventIndex = CreateTypeIndex(NodeKind.ManualResetEvent);
+            AwaitTaskContinuationIndex = CreateTypeIndex(NodeKind.AwaitTaskContinuation);
 
-            ThreadIndex = CreatTypeIndex(NodeKind.Thread);
-            TaskCompletionSourceIndex = CreatTypeIndex(NodeKind.TaskCompletionSource);
-            SemaphoreSlimIndex = CreatTypeIndex(NodeKind.SemaphoreSlim, addToIndex: false);
-            SemaphoreWrapperIndex = CreatTypeIndex(NodeKind.SemaphoreWrapper, addToIndex: false);
+            ThreadIndex = CreateTypeIndex(NodeKind.Thread);
+            TaskCompletionSourceIndex = CreateTypeIndex(NodeKind.TaskCompletionSource);
+            SemaphoreSlimIndex = CreateTypeIndex(NodeKind.SemaphoreSlim, addToIndex: false);
+            SemaphoreWrapperIndex = CreateTypeIndex(NodeKind.SemaphoreWrapper, addToIndex: false);
+            IAsyncStateMachineTypeIndex = CreateTypeIndex(NodeKind.AsyncStateMachine);
 
             FillTaskSentinels(_taskCompletionSentinels);
 
@@ -64,6 +69,7 @@ namespace AsyncCausalityDebuggerNew
 
             // There are two "WhenAllPromise" types - one for Task<T>.WhenAll and another one for Task.WhenAll
             _whenAllTypes = TaskIndex.GetTypesByFullName("System.Threading.Tasks.Task+WhenAllPromise").ToHashSet(ClrTypeEqualityComparer.Instance);
+            
         }
 
         public static TypesRegistry Create(ClrHeap heap)
@@ -83,6 +89,8 @@ namespace AsyncCausalityDebuggerNew
         public bool IsTaskCompletionSource(ClrType? type) => type != null && (TaskCompletionSourceIndex.ContainsType(type) || type.Name.Contains("TaskSourceSlim"));
 
         public bool IsSemaphoreWrapper(ClrType? type) => type != null && SemaphoreWrapperIndex.ContainsType(type);
+        
+        public bool IsAsyncStateMachine(ClrType? type) => type != null && type.Interfaces.Any(i => i.Name == IAsyncStateMachineType.Name);
 
         /// <summary>
         /// Returns true if a given <paramref name="continuation"/> is a special Task.s_taskCompletionSentinel instance.
@@ -239,12 +247,14 @@ namespace AsyncCausalityDebuggerNew
                     throw new NotSupportedException(); // todoc
                 case NodeKind.TaskCompletionSource:
                     return GetClrTypeFor(typeof(TaskCompletionSource<>));
+                case NodeKind.AsyncStateMachine:
+                    return GetClrTypeByFullName("System.Runtime.CompilerServices.IAsyncStateMachine");
                 default:
                     throw new ArgumentOutOfRangeException(nameof(kind), kind, null);
             }
         }
 
-        private TypeIndex CreatTypeIndex(NodeKind kind, bool addToIndex = true)
+        private TypeIndex CreateTypeIndex(NodeKind kind, bool addToIndex = true)
         {
             var result = new TypeIndex(GetClrTypeFor(kind), kind);
 

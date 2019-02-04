@@ -107,6 +107,7 @@ namespace AsyncCausalityDebuggerNew
                 }
 
                 writer.AddNode(new DgmlWriter.Node(id: node.Id, label: node.ToString()));
+
                 foreach (var dependency in node.Dependencies.OrderBy(d => d.Id))
                 {
                     writer.AddLink(new DgmlWriter.Link(
@@ -114,6 +115,17 @@ namespace AsyncCausalityDebuggerNew
                         target: dependency.Id,
                         label: null));
                 }
+
+                //if (node.Kind == NodeKind.AwaitTaskContinuation)
+                //{
+                //    foreach (var dependency in node.Dependents.OrderBy(d => d.Id))
+                //    {
+                //        writer.AddLink(new DgmlWriter.Link(
+                //            source: dependency.Id,
+                //            target: node.Id,
+                //            label: null));
+                //    }
+                //}
             }
 
             if (whatIf)

@@ -4,26 +4,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using AsyncDbgCore.New;
 using Microsoft.Diagnostics.Runtime;
-
 #nullable enable
 
 namespace AsyncCausalityDebuggerNew
 {
-    public readonly struct TaskInstance
-    {
-        private readonly ClrInstance _instance;
-
-        public TaskInstance(ClrInstance instance)
-        {
-            _instance = instance;
-        }
-
-        public TaskStatus Status => TaskInstanceHelpers.GetStatus(m_stateFlags);
-
-        public bool IsCanceled => (bool)(_instance[nameof(IsCanceled)].Instance.Value);
-
-        private int m_stateFlags => (int)(_instance[nameof(m_stateFlags)].Instance.Value);
-    }
 
     public class CausalityNode
     {
@@ -42,6 +26,7 @@ namespace AsyncCausalityDebuggerNew
         public NodeKind Kind { get; }
 
         private bool ProcessingContinuations { get; set; }
+
         public bool IsComplete
         {
             get
@@ -49,10 +34,19 @@ namespace AsyncCausalityDebuggerNew
                 switch (Kind)
                 {
                     case NodeKind.Task:
-                        var status = Status;
-                        return (status == TaskStatus.RanToCompletion || status == TaskStatus.Canceled || status == TaskStatus.Faulted) && !ProcessingContinuations;
+                        var taskInstance = new TaskInstance(TaskInstance);
+                        return taskInstance.IsCompleted && !ProcessingContinuations;
                     case NodeKind.TaskCompletionSource:
                         return CompletionSourceTaskNode?.IsComplete == true;
+                    case NodeKind.AwaitTaskContinuation:
+                        if (TargetInstance != null && TargetInstance.TryGetFieldValue("<>1__state")?.Instance?.Value.Equals((object)-2) == true)
+                        {
+                            return true;
+                        }
+
+                        return false;
+                    case NodeKind.Thread:
+                        return Dependencies.All(d => d.IsComplete);
                     default:
                         return false;
                 }
@@ -81,8 +75,6 @@ namespace AsyncCausalityDebuggerNew
             return IsTask ? (int)(TaskInstance["m_stateFlags"].Instance.ValueOrDefault) : 0;
         }
 
-        private readonly TaskInstance _taskInstance;
-
         public CausalityNode(CausalityContext context, ClrInstance task, NodeKind kind)
         {
             Context = context;
@@ -90,12 +82,7 @@ namespace AsyncCausalityDebuggerNew
             Id = task.ValueOrDefault?.ToString() ?? string.Empty;
             Kind = kind;
 
-            if (kind == NodeKind.Task)
-            {
-                _taskInstance = new TaskInstance(task);
-            }
-
-            if (TaskInstance.ObjectAddress == 2461822515200L || TaskInstance.ObjectAddress == 2461822516072L)
+            if (TaskInstance.ObjectAddress == 2557664314544L || TaskInstance.ObjectAddress == 2557664286008L)
             {
 
             }
@@ -103,7 +90,12 @@ namespace AsyncCausalityDebuggerNew
 
         public void Link()
         {
-            if (TaskInstance.ObjectAddress == 2427805496392L)
+            if (TaskInstance.ObjectAddress == 2585904186960L) // FileSystemContentStoreInternal.ShutdownCore
+            {
+
+            }
+
+            if (TaskInstance.ObjectAddress == 2557664314544L || TaskInstance.ObjectAddress == 2557664286008L)
             {
 
             }
@@ -167,6 +159,14 @@ namespace AsyncCausalityDebuggerNew
                     foreach (var stackObject in clrThread.EnumerateStackObjects())
                     {
                         var so = stackObject;
+
+                        // Handle the state machine from the stack.
+                        if (Context.Registry.IsAsyncStateMachine(so.Type))
+                        {
+                            var asyncStateMachineInstance = ClrInstance.CreateInstance(Context.Heap, so.Object, so.Type);
+                            ProcessStateMachineContinuation(asyncStateMachineInstance);
+                        }
+
                         if (Context.TryGetNodeAt(stackObject.Object, out var node))
                         {
                             if (node != this)
@@ -277,9 +277,9 @@ namespace AsyncCausalityDebuggerNew
                         }
 
                         TargetInstance = stateMachine;
-                        FindSemaphores(TargetInstance);
+                        FindSemaphores(stateMachine);
 
-                        if (TargetInstance.TryGetFieldValue("<>t__builder", out var asyncMethodBuilderField))
+                        if (stateMachine.TryGetFieldValue("<>t__builder", out var asyncMethodBuilderField))
                         {
                             var asyncMethodBuild = asyncMethodBuilderField.Instance;
                             // Looking for a builder instance for async state machine generated for async Task and async ValueTask methods.
@@ -301,6 +301,79 @@ namespace AsyncCausalityDebuggerNew
                             else
                             {
                             }
+
+                            // This is an await continuation and the next continuation may be already finished.
+                            // In this case we mark the current instance as completed as well.
+                            //if (Context.)
+                        }
+                        else
+                        {
+                        }
+                    }
+                    else if (continuation.IsOfType(Context.StandardTaskContinuationType) || Context.TaskCompletionSourceIndex.ContainsType(continuation.Type))
+                    {
+                        nextContinuation = continuation["m_task"].Instance;
+                    }
+                    else if (continuation.IsCompletedTaskContinuation(Context))
+                    {
+                        // Continuation is a special sentinel instance that indicates that the task is completed.
+                        break;
+                    }
+                    // Need to compare by name since GetTypeByName does not work for the generic type during initialization
+                    else if (continuation.Type?.Name == "System.Collections.Generic.List<System.Object>")
+                    {
+                        var size = (int)continuation["_size"].Instance.ValueOrDefault;
+                        var items = continuation["_items"].Instance.Items;
+                        for (int i = 0; i < size; i++)
+                        {
+                            var continuationItem = items[i];
+                            ProcessContinuation(continuationItem);
+                        }
+                    }
+                    else if (Context.AwaitTaskContinuationIndex.ContainsType(continuation.Type))
+                    {
+                        nextContinuation = continuation["m_action"].Instance;
+                    }
+                    else
+                    {
+                        //continuation.ComputeInfo();
+                    }
+                }
+            }
+        }
+
+        private void ProcessStateMachineContinuation(ClrInstance? nextContinuation)
+        {
+            while (nextContinuation != null)
+            {
+                var continuation = nextContinuation;
+
+                nextContinuation = null;
+
+                if (!continuation.IsNull)
+                {
+                    if (Context.TryGetNodeFor(continuation, out var dependentNode))
+                    {
+                        AddEdge(dependency: this, dependent: dependentNode);
+                    }
+                    else if (continuation.TryGetFieldValue("<>t__builder", out var asyncMethodBuilderField))
+                    {
+                        var asyncMethodBuild = asyncMethodBuilderField.Instance;
+                        // Looking for a builder instance for async state machine generated for async Task and async ValueTask methods.
+                        if (asyncMethodBuild.TryGetFieldValue("m_builder", out var innerAsyncMethodBuilderField) ||
+                            asyncMethodBuild.TryGetFieldValue("_methodBuilder", out innerAsyncMethodBuilderField))
+                        {
+                            asyncMethodBuild = innerAsyncMethodBuilderField.Instance;
+                        }
+
+                        if (asyncMethodBuild.TryGetFieldValue("m_task", out var asyncMethodBuilderTaskField))
+                        {
+                            nextContinuation = asyncMethodBuilderTaskField.Instance;
+                        }
+                        //else if (asyncMethodBuild.Type.IsOfType(typeof(Task)))
+                        else if (Context.Registry.IsTask(asyncMethodBuild.Type))
+                        {
+                            nextContinuation = asyncMethodBuild;
                         }
                         else
                         {
@@ -400,7 +473,7 @@ namespace AsyncCausalityDebuggerNew
 
         public override string ToString()
         {
-            var result = $"({Dependencies.Count}) [{(IsTask ? DisplayStatus.ToString() : Kind.ToString())}] {TaskInstance?.ToString() ?? ""}";
+            var result = $"({Dependencies.Count}, {Dependents.Count}) [{(IsTask ? DisplayStatus.ToString() : Kind.ToString())}] {TaskInstance?.ToString() ?? ""}";
             if (Thread != null && (Dependencies.Count != 0 || Dependents.Count != 0))
             {
                 result += Environment.NewLine + string.Join(Environment.NewLine, Thread.StackTrace);

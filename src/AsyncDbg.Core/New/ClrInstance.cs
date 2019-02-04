@@ -179,7 +179,7 @@ namespace AsyncCausalityDebuggerNew
             return ClrTypeEqualityComparer.Instance.Equals(Type, type);
         }
 
-        private ClrFieldValue? TryGetFieldValue(string fieldName)
+        public ClrFieldValue? TryGetFieldValue(string fieldName)
         {
             var propertyName = $"<{fieldName}>k__BackingField";
             foreach (var field in Fields)

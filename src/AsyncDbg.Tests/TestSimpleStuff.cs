@@ -72,8 +72,10 @@ namespace Test.AsyncCausalityInspector
         [Test]
         public void CheckTheDump()
         {
-            string path = @"C:\Users\seteplia\AppData\Local\Temp\xunit.console (8).DMP";
+            string path = @"C:\Users\seteplia\AppData\Local\Temp\xunit.console (2).DMP";
 
+            //var contextNew = AsyncCausalityDebugger.CausalityContext.LoadCausalityContextFromDump(path);
+            //var newContent = contextNew.SaveDgml(path + ".dgml", whatIf: false);
             var contextNew = AsyncCausalityDebuggerNew.CausalityContext.LoadCausalityContextFromDump(path);
             var newContent = contextNew.SaveDgml(path + ".dgml", whatIf: false);
         }
@@ -82,6 +84,28 @@ namespace Test.AsyncCausalityInspector
         public void AwaitForCompletedTask()
         {
             string path = @"F:\Sources\GitHub\AsyncDbg\src\SampleDumps\AwaitForCompletedTask.dmp";
+
+            //var context = CausalityContext.LoadCausalityContextFromDump(path);
+            //var oldContent = context.SaveDgml(path + ".dgml", whatIf: false);
+            var contextNew = AsyncCausalityDebuggerNew.CausalityContext.LoadCausalityContextFromDump(path);
+            var newContent = contextNew.SaveDgml(path + ".dgml", whatIf: false);
+        }
+
+        [Test]
+        public void AwaitForTaskCompletionSource()
+        {
+            string path = @"F:\Sources\GitHub\AsyncDbg\src\SampleDumps\WaitingOnTcs.dmp";
+
+            //var context = CausalityContext.LoadCausalityContextFromDump(path);
+            //var oldContent = context.SaveDgml(path + ".dgml", whatIf: false);
+            var contextNew = AsyncCausalityDebuggerNew.CausalityContext.LoadCausalityContextFromDump(path);
+            var newContent = contextNew.SaveDgml(path + ".dgml", whatIf: false);
+        }
+
+        [Test]
+        public void AwaitForUnfinishedTask()
+        {
+            string path = @"F:\Sources\GitHub\AsyncDbg\src\SampleDumps\AwaitForUnfinishedTask.dmp";
 
             //var context = CausalityContext.LoadCausalityContextFromDump(path);
             //var oldContent = context.SaveDgml(path + ".dgml", whatIf: false);

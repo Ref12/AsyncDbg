@@ -1,9 +1,4 @@
-﻿using System.Collections.Generic;
-using System.IO;
-using System.Text;
-using AsyncDbgCore;
-
-namespace AsyncCausalityDebuggerNew
+﻿namespace AsyncCausalityDebuggerNew
 {
     public enum NodeKind
     {
@@ -14,7 +9,7 @@ namespace AsyncCausalityDebuggerNew
         ManualResetEventSlim,
         AwaitTaskContinuation,
         ManualResetEvent,
-        //AsyncStateMachine,
+        AsyncStateMachine,
         SemaphoreSlim,
         SemaphoreWrapper,
         Thread,
