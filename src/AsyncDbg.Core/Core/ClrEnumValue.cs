@@ -12,9 +12,15 @@ using Microsoft.Diagnostics.Runtime;
 
 namespace AsyncDbgCore.Core
 {
+    /// <summary>
+    /// Represents enum instance at runtime.
+    /// </summary>
     public class ClrEnumValue
     {
+        /// <nodoc />
         public string Name { get; }
+
+        /// <nodoc />
         public long Value { get; }
 
         /// <nodoc />
@@ -24,25 +30,36 @@ namespace AsyncDbgCore.Core
             Value = value;
         }
 
+        /// <nodoc />
         public ClrEnumValue(long value, List<ClrEnumValue> values)
             : this(string.Join(" | ", values.Select(v => v.Name)), value)
         {
         }
 
+        /// <inheritdoc />
         public override string ToString()
         {
             return Name;
         }
 
+        /// <inheritdoc />
         public override bool Equals(object obj)
         {
             if (obj is string)
             {
-                throw new Exception("Reachable.!");
                 return string.Equals(Name, (string)obj, StringComparison.OrdinalIgnoreCase);
             }
 
             return base.Equals(obj);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            var hashCode = -244751520;
+            hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(Name);
+            hashCode = hashCode * -1521134295 + Value.GetHashCode();
+            return hashCode;
         }
     }
 

@@ -11,7 +11,7 @@ using AsyncDbgCore.Core;
 using AsyncDbgCore.New;
 using Microsoft.Diagnostics.Runtime;
 using AsyncDbg.Extensions;
-using HeapExtensions = AsyncDbgCore.Core.HeapExtensions;
+//using HeapExtensions = AsyncDbgCore.Core.HeapExtensions;
 using AsyncCausalityDebuggerNew;
 
 namespace AsyncCausalityDebugger

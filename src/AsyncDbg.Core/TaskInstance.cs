@@ -5,7 +5,7 @@ using static AsyncCausalityDebuggerNew.TaskInstanceHelpers;
 namespace AsyncCausalityDebuggerNew
 {
     /// <summary>
-    /// Helper struct that mimics and actual interface of <see cref="Task"/> class.
+    /// Wrapper around <see cref="ClrInstance"/> that mimics an actual interface of <see cref="Task"/> class.
     /// </summary>
     public readonly struct TaskInstance
     {

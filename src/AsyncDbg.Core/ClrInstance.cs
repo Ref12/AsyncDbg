@@ -121,7 +121,7 @@ namespace AsyncCausalityDebuggerNew
             {
                 throw new InvalidOperationException($"It seems that address '{address}' does not points to a valid managed object.");
             }
-            
+
             return new ClrInstance(heap, address, type, interior: false);
         }
 

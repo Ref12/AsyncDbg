@@ -12,7 +12,6 @@ namespace AsyncCausalityDebuggerNew
     public class CausalityContext
     {
         private readonly ConcurrentDictionary<ulong, CausalityNode> _nodesByAddress = new ConcurrentDictionary<ulong, CausalityNode>();
-        //private readonly ConcurrentDictionary<ClrInstance, CausalityNode> _nodes = new ConcurrentDictionary<ClrInstance, CausalityNode>(new ClrInstanceAddressComparer());
         private readonly Dictionary<int, ClrThread> _threadsById;
 
         public TypeIndex AwaitTaskContinuationIndex => Registry.AwaitTaskContinuationIndex;

@@ -16,6 +16,7 @@ using Microsoft.Diagnostics.Runtime;
 using AsyncDbg.Extensions;
 using ClrInstance = AsyncDbgCore.Core.ClrInstance;
 using AsyncCausalityDebuggerNew;
+using AsyncDbgCore.New;
 
 namespace AsyncDbgCore
 {

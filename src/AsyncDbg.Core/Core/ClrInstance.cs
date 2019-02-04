@@ -5,13 +5,9 @@
 // --------------------------------------------------------------------
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using AsyncCausalityDebugger;
 using Microsoft.Diagnostics.Runtime;
-using AsyncDbg.Extensions;
 
 namespace AsyncDbgCore.Core
 {
@@ -60,8 +56,6 @@ namespace AsyncDbgCore.Core
         /// <summary>
         /// Gets the field instance by <paramref name="fieldName"/>.
         /// </summary>
-        /// <param name="fieldName"></param>
-        /// <returns></returns>
         public ClrInstance this[string fieldName] => ClrFieldValue.Create(Type.GetFieldByName(fieldName), this).Instance;//Fields.FirstOrDefault(f => f.Field.Name == fieldName)?.Instance;
 
 
@@ -79,7 +73,6 @@ namespace AsyncDbgCore.Core
         /// <summary>
         /// Returns an actual object's value.
         /// </summary>
-        /// <returns></returns>
         public object GetValue()
         {
             return Value ?? ObjectAddress;
@@ -212,7 +205,7 @@ namespace AsyncDbgCore.Core
             }
 
             var address = Type.GetArrayElementAddress(ObjectAddress, index);
-            
+
             //if (value == null)
             //{
             //    value = Type.GetArrayElementAddress(ObjectAddress, index);
@@ -342,21 +335,6 @@ namespace AsyncDbgCore.Core
             private ClrFieldValue[] Fields { get; }
 
             private ClrType Type { get; }
-        }
-    }
-
-    public static class HeapExtensions
-    {
-        public static IEnumerable<ClrInstance> EnumerateClrObjects(this ClrHeap heap)
-        {
-            foreach (var address in heap.EnumerateObjectAddresses())
-            {
-                var result = ClrInstance.FromAddress(address, heap);
-                if (result != null)
-                {
-                    yield return result;
-                }
-            }
         }
     }
 }

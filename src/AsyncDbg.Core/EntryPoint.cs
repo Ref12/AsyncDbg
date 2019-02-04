@@ -44,8 +44,6 @@ namespace AsyncDbgCore.New
                 Console.WriteLine(PrintArray(a));
             }
 
-            
-
             Console.WriteLine("Done!");
         }
 
