@@ -4,12 +4,15 @@
 //
 // --------------------------------------------------------------------
 
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
+using AsyncCausalityDebuggerNew;
 
 namespace AsyncCausalityDebugger
 {
@@ -36,10 +39,14 @@ namespace AsyncCausalityDebugger
             [XmlAttribute]
             public string Label;
 
-            public Node(string id, string label)
+            [XmlIgnore]
+            public CausalityNode CausalityNode;
+
+            public Node(string id, string label, CausalityNode causalityNode)
             {
                 Id = id;
                 Label = label;
+                CausalityNode = causalityNode;
             }
         }
 
@@ -83,11 +90,61 @@ namespace AsyncCausalityDebugger
             Links.Add(l);
         }
 
-        public void Serialize(string xmlpath)
+        public void Serialize(string xmlpath, Func<Node, bool> filter = null)
         {
             Graph g = new Graph();
-            g.Nodes = Nodes.ToArray();
-            g.Links = Links.ToArray();
+
+            List<Node> nodes = new List<Node>(Nodes.Count);
+            List<Link> links = new List<Link>(Links.Count);
+            if (filter != null)
+            {
+                HashSet<string> filteredOutNodes = new HashSet<string>();
+
+                foreach (var node in Nodes)
+                {
+                    if (filter(node))
+                    {
+                        //filteredOutNodes.Add(node.Id);
+                        foreach (var d in node.CausalityNode.EnumerateDependentsAndSelf())
+                        {
+                            filteredOutNodes.Add(d.Id);
+                        }
+                    }
+                    else
+                    {
+                        nodes.Add(node);
+                    }
+                }
+
+                //foreach (var link in Links)
+                //{
+                //    if (filteredOutNodes.Contains(link.Source))
+                //    {
+                //        filteredOutNodes.Add(link.Target);
+                //    }
+
+                //    if (filteredOutNodes.Contains(link.Target))
+                //    {
+                //        filteredOutNodes.Add(link.Source);
+                //    }
+                //}
+
+                foreach (var link in Links)
+                {
+                    if (!filteredOutNodes.Contains(link.Source) && !filteredOutNodes.Contains(link.Target))
+                    {
+                        links.Add(link);
+                    }
+                }
+            }
+            else
+            {
+                nodes = Nodes;
+                links = Links;
+            }
+
+            g.Nodes = nodes.ToArray();
+            g.Links = links.ToArray();
 
             XmlRootAttribute root = new XmlRootAttribute("DirectedGraph");
             root.Namespace = "http://schemas.microsoft.com/vs/2009/dgml";

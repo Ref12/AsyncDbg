@@ -15,10 +15,49 @@ namespace AsyncCausalityDebuggerNew
         public ClrInstance TaskInstance { get; }
 
         public CausalityNode? CompletionSourceTaskNode { get; private set; }
+
         public ThreadInstance? Thread { get; private set; }
         public ClrInstance? TargetInstance { get; private set; }
+
         public readonly HashSet<CausalityNode> Dependencies = new HashSet<CausalityNode>();
         public readonly HashSet<CausalityNode> Dependents = new HashSet<CausalityNode>();
+
+        public IEnumerable<CausalityNode> EnumerateDependentsAndSelf()
+        {
+            // Using queue to get depth first left to right traversal. Stack would give right to left traversal.
+            var queue = new Queue<CausalityNode>();
+
+            queue.Enqueue(this);
+
+            while (queue.Count > 0)
+            {
+                var next = queue.Dequeue();
+                yield return next;
+
+                //using (var listWrapper = next.Dependents)
+                {
+                    foreach (var n in next.Dependents)
+                    {
+                        //foreach (var c in n)
+                        {
+                            queue.Enqueue(n);
+                        }
+                    }
+                }
+            }
+
+
+            IEnumerable<CausalityNode> enumerate(CausalityNode n)
+            {
+                yield return n;
+
+                foreach (var d in n.Dependents)
+                {
+                    yield return d;
+                }
+            }
+
+        }
 
         public string Id { get; }
 

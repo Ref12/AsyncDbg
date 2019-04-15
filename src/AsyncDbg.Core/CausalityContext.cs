@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using AsyncCausalityDebugger;
+using AsyncDbgCore.New;
 using Microsoft.Diagnostics.Runtime;
 
 #nullable enable
@@ -53,7 +54,13 @@ namespace AsyncCausalityDebuggerNew
 
         public bool TryGetNodeFor(ClrInstance instance, out CausalityNode result)
         {
-            return _nodesByAddress.TryGetValue(instance.ObjectAddress.Value, out result);
+            if (instance.ObjectAddress != null)
+            {
+                return _nodesByAddress.TryGetValue(instance.ObjectAddress.Value, out result);
+            }
+
+            result = null;
+            return false;
         }
 
         public bool TryGetThreadById(int threadId, out ClrThread thread) => _threadsById.TryGetValue(threadId, out thread);
@@ -90,23 +97,92 @@ namespace AsyncCausalityDebuggerNew
             }
         }
 
+        public string OverallStats(string filePath)
+        {
+            var list = new List<AsyncStack>();
+
+            var roots = _nodesByAddress.Values.Where(n => n.Dependencies.Count == 0).ToArray();
+            //foreach (var node in _nodesByAddress.Values.OrderBy(v => v.Id))
+            //foreach (var node in _nodesByAddress.Values.OrderBy(v => v.Id))
+            //{
+            //    if (node.Dependencies.Count == 0 && node.Dependents.Count == 0)
+            //    {
+            //        continue;
+            //    }
+
+            //    if (RanToCompletion(node))
+            //    {
+            //        continue;
+            //    }
+
+            //    writer.AddNode(new DgmlWriter.Node(id: node.Id, label: node.ToString()));
+
+                
+            //    foreach (var dependency in node.Dependencies.OrderBy(d => d.Id))
+            //    {
+            //        writer.AddLink(new DgmlWriter.Link(
+            //            source: node.Id,
+            //            target: dependency.Id,
+            //            label: null));
+            //    }
+
+            //    //if (node.Kind == NodeKind.AwaitTaskContinuation)
+            //    //{
+            //    //    foreach (var dependency in node.Dependents.OrderBy(d => d.Id))
+            //    //    {
+            //    //        writer.AddLink(new DgmlWriter.Link(
+            //    //            source: dependency.Id,
+            //    //            target: node.Id,
+            //    //            label: null));
+            //    //    }
+            //    //}
+            //}
+
+            var nodes = _nodesByAddress.Values.ToArray();
+            var waitingOnSempahore = nodes.Where(t => t.ToString().Contains("SemaphoreSlimToken") && t.ToString().Contains("Wait")).ToList();
+            var pinBatches = nodes.Where(t => t.ToString().Contains("Grpc") && t.ToString().Contains("PinBatchAsync"))
+                .ToArray();
+
+            var fetchPackages = nodes.Where(t => t.ToString().Contains("NugetCacheStorage") && t.ToString().Contains("FetchPackageAsync"))
+                .ToArray();
+
+            return string.Empty;
+        }
+
         public string SaveDgml(string filePath, bool whatIf = false)
         {
             var writer = new DgmlWriter();
+            //var roots = _nodesByAddress.Values.Where(n => n.Dependencies.Count != 0).ToArray();
             foreach (var node in _nodesByAddress.Values.OrderBy(v => v.Id))
+            //foreach (var node in roots.OrderBy(v => v.Id))
             {
                 if (node.Dependencies.Count == 0 && node.Dependents.Count == 0)
                 {
                     continue;
                 }
 
+                //if (node.ToString().Contains("DBS.Tools.HashedPackage") || node.ToString().Contains("FetchHashedPackageDefinitionAsync"))
+                //{
+                //    continue;
+                //}
+
+                //if (node.ToString().Contains("SemaphoreSlimToken") && node.ToString().Contains("Wait"))
+                //{
+                //    continue;
+                //}
+
+                //if (node.ToString().Contains("Grpc.GrpcClient") && node.ToString().Contains("PinBatchAsync"))
+                //{
+                //    continue;
+                //}
+
                 if (RanToCompletion(node))
                 {
                     continue;
                 }
 
-                writer.AddNode(new DgmlWriter.Node(id: node.Id, label: node.ToString()));
-
+                writer.AddNode(new DgmlWriter.Node(id: node.Id, label: node.ToString(), node));
+                
                 foreach (var dependency in node.Dependencies.OrderBy(d => d.Id))
                 {
                     writer.AddLink(new DgmlWriter.Link(
@@ -127,12 +203,81 @@ namespace AsyncCausalityDebuggerNew
                 //}
             }
 
+
             if (whatIf)
             {
                 return writer.SerializeAsString();
             }
 
-            writer.Serialize(filePath);
+            int grpcPinBulk = 0;
+            int semaphoreWaits = 0;
+            int hashPackage = 0;
+            int AddOrGetContentHashListResult = 0;
+            int GetContentHashListAsync = 0;
+            int FetchHashedPackageDefinitionAsync = 0;
+            int RunExclusiveAsync = 0;
+            writer.Serialize(filePath, node =>
+            {
+                var label = node.Label;
+                //return false;
+                //if (label.Contains("ContentServerClient.PinBulkAsync(ContentStore.Grpc.PinBulkRequest,") ||
+                //    label.Contains("<PinBatchAsync>") || label.Contains("GrpcClient+<PinAsync>"))
+                //{
+                //    grpcPinBulk++;
+                //    return true;
+                //}
+
+                //if (label.Contains("SemaphoreSlimToken+<Wait>"))
+                //{
+                //    semaphoreWaits++;
+                //    return true;
+                //}
+
+                //if (label.Contains("DBS.Tools.NugetCacheStorage+<FetchPackageAsync"))
+                //{
+                //    hashPackage++;
+                //    return true;
+                //}
+
+                ////if (label.Contains(
+                ////    "Task<BuildXL.Cache.MemoizationStore.Interfaces.Results.AddOrGetContentHashListResult"))
+                ////{
+                ////    AddOrGetContentHashListResult++;
+                ////    return true;
+                ////}
+
+                //if (label.Contains(
+                //    "DBS.CloudBuild.CacheAggregators.CloudBuildCacheSession+<GetContentHashListAsync"))
+                //{
+                //    GetContentHashListAsync++;
+                //    return true;
+                //}
+
+                //if (label.Contains(
+                //    "DBS.Tools.NugetCacheStorage+<FetchHashedPackageDefinitionAsync"))
+                //{
+                //    FetchHashedPackageDefinitionAsync++;
+                //    return true;
+                //}
+
+                if (label.Contains(
+                    "BuildXL.Cache.ContentStore.SQLite.SQLiteDatabase+<RunExclusiveAsync"))
+                {
+                    RunExclusiveAsync++;
+                    return true;
+                }
+
+                //if (label.Contains("System.Threading.Tasks.Task<BuildXL.Cache.ContentStore.Interfaces.Synchronization.Internal.SemaphoreSlimToken"))
+                //{
+                //    semaphoreWaits2++;
+                //    return true;
+                //}
+
+                return false;
+            });
+
+            Console.WriteLine($"GrpcPinBulk: {grpcPinBulk}, SemaphoreWaits: {semaphoreWaits}, FetchPackageAsync: {hashPackage}, AddOrGetContentHashListResult: {AddOrGetContentHashListResult}, GetContentHashListAsync: {GetContentHashListAsync}, FetchHashedPackageDefinitionAsync: {FetchHashedPackageDefinitionAsync}, RunExclusiveAsync: {RunExclusiveAsync}");
+
             return writer.SerializeAsString();
         }
 

@@ -7,7 +7,7 @@
     <ProjectGuid>{DCFDF7DA-28D9-47A8-AAA2-7098B23DCF22}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>AsyncDbg.Core</RootNamespace>
+    <RootNamespace>AsyncDbg</RootNamespace>
     <AssemblyName>AsyncDbg.Core</AssemblyName>
     <TargetFrameworkVersion>v4.7.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
@@ -49,37 +49,31 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Core\ClrEnumTypeInfo.cs" />
     <Compile Include="Contract.cs" />
     <Compile Include="Core\ClrEnumValue.cs" />
-    <Compile Include="Core\ClrFieldValue.cs" />
-    <Compile Include="Core\ClrInstance.cs" />
-    <Compile Include="Core\ClrInstanceDynamicProxy2.cs" />
     <Compile Include="AsyncStack.cs" />
-    <Compile Include="ClrInstanceDynamicProxy.cs" />
-    <Compile Include="ClrInstanceExtensions.cs" />
-    <Compile Include="ClrTypeExtensions.cs" />
+    <Compile Include="Core\ClrInstanceExtensions.cs" />
+    <Compile Include="Core\ClrTypeExtensions.cs" />
     <Compile Include="DgmlWriter.cs" />
-    <Compile Include="ProxyExtensions\DynamicProxy.cs" />
-    <Compile Include="ProxyExtensions\Extensions.cs" />
     <Compile Include="CausalityContext.cs" />
     <Compile Include="CausalityNode.cs" />
-    <Compile Include="ClrFieldValue.cs" />
-    <Compile Include="ClrInstance.cs" />
+    <Compile Include="Core\ClrFieldValue.cs" />
+    <Compile Include="Core\ClrInstance.cs" />
     <Compile Include="EntryPoint.cs" />
     <Compile Include="EnumerableExtensions.cs" />
-    <Compile Include="EqualityCompareres.cs" />
-    <Compile Include="HeapExtensions.cs" />
+    <Compile Include="Core\EqualityCompareres.cs" />
+    <Compile Include="Core\HeapExtensions.cs" />
     <Compile Include="TaskContinuation.cs" />
-    <Compile Include="TaskInstanceHelpers.cs" />
+    <Compile Include="InstanceWrappers\TaskInstanceHelpers.cs" />
     <Compile Include="TypeIndex.cs" />
     <Compile Include="TypesRegistry.cs" />
     <Compile Include="NotNullableAttributes.cs" />
     <Compile Include="Program.cs" />
-    <Compile Include="Program2.cs" />
     <Compile Include="NodeKind.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="TaskInstance.cs" />
-    <Compile Include="ThreadInstance.cs" />
+    <Compile Include="InstanceWrappers\TaskInstance.cs" />
+    <Compile Include="InstanceWrappers\ThreadInstance.cs" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

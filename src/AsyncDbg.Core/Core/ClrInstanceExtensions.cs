@@ -72,21 +72,11 @@ namespace AsyncDbgCore.New
         /// </remarks>
         public static bool IsCompletedTaskContinuation(this ClrInstance continuation, CausalityContext context)
         {
-            //if (!continuation.IsTaskLike(context.Registry))
-            //{
-            //    return false;
-            //}
-
             return context.Registry.IsTaskCompletionSentinel(continuation);
         }
 
         public static bool IsCompletedTaskContinuation(this ClrInstance continuation, TypesRegistry registry)
         {
-            //if (!continuation.IsTaskLike(registry))
-            //{
-            //    return false;
-            //}
-
             return registry.IsTaskCompletionSentinel(continuation);
         }
 

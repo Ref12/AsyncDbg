@@ -11,6 +11,7 @@ namespace AsyncCausalityDebuggerNew
     {
         private readonly ClrInstance _instance;
 
+        /// <nodoc />
         public TaskInstance(ClrInstance instance)
         {
             _instance = instance;

@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Microsoft.Diagnostics.Runtime;
+
 #nullable enable
 namespace AsyncCausalityDebuggerNew
 {
@@ -28,11 +29,7 @@ namespace AsyncCausalityDebuggerNew
         public static readonly ClrTypeEqualityComparer Instance = new ClrTypeEqualityComparer();
         public override bool Equals(ClrType? x, ClrType? y)
         {
-
-            return (
-                       (x?.MetadataToken == y?.MetadataToken) ||
-                       (x?.Name == y?.Name)) &&
-                   x?.Module.FileName == y?.Module.FileName;
+            return ((x?.MetadataToken == y?.MetadataToken) || (x?.Name == y?.Name)) && x?.Module.FileName == y?.Module.FileName;
         }
 
         public override int GetHashCode(ClrType? obj)

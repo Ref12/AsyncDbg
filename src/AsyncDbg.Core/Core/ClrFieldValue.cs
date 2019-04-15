@@ -1,90 +1,57 @@
-﻿// --------------------------------------------------------------------
-//  
-// Copyright (c) Microsoft Corporation.  All rights reserved.
-//  
-// --------------------------------------------------------------------
-
-using System;
+﻿using System;
+using AsyncDbgCore.Core;
 using Microsoft.Diagnostics.Runtime;
 
-namespace AsyncDbgCore.Core
+namespace AsyncCausalityDebuggerNew
 {
-    public class ClrFieldValue
+    /// <summary>
+    /// Represents a field of an object with its value.
+    /// </summary>
+    public sealed class ClrFieldValue
     {
-        public ClrInstanceField Field { get; }
-        public ClrInstance Instance { get; }
+        public ClrInstanceField Field { get; } // NotNull
+        public ClrInstance Instance { get; } // NotNull, Instance.IsNull may be true.
 
-        /// <inheritdoc />
-        public ClrFieldValue(ClrInstanceField field, ClrInstance instance)
+        private ClrFieldValue(ClrInstanceField field, ClrInstance instance)
         {
-            Field = field;
-            Instance = instance;
+            Field = field ?? throw new ArgumentNullException(nameof(field));
+            Instance = instance ?? throw new ArgumentNullException(nameof(instance));
         }
 
-        internal static ClrFieldValue Create(ClrInstanceField typeField, ClrInstance instance)
+        internal static ClrFieldValue Create(ClrInstanceField typeField, ClrInstance instance, bool interior)
         {
-            var getValueTypeField = typeField;
+            var getValueTypeField = typeField ?? throw new ArgumentNullException(nameof(typeField));
+            instance = instance ?? throw new ArgumentNullException(nameof(instance));
+
             if (typeField.Type.MetadataToken == 0 && typeField.Type.Name == "ERROR")
             {
-                throw new NotSupportedException();
-                //if (ClrInstance.BypassFieldsByFieldName.TryGetValue(typeField.Name, out var bypassField))
-                //{
-                //    getValueTypeField = bypassField;
-                //}
+                return null;
+                // TODO: not sure about this!
+                //throw new NotSupportedException();
             }
 
-            var value = getValueTypeField.GetValue(instance.ObjectAddress);
-
-            //if (IsReference(value, typeField.Type))
-            //{
-            //    var fieldAddress = (ulong)value;
-
-            //    // Sometimes, ClrMD isn't capable of resolving the property type using the field
-            //    // Try again using directly the address, in case we fetch something different
-            //    if (fieldAddress != 0)
-            //    {
-            //        var type2 = instance.Heap.GetObjectType(fieldAddress);
-            //        if (type2 != null)
-            //        {
-            //            var alternativeValue = type2.GetValue(fieldAddress);
-
-            //            if (!(alternativeValue is ulong))
-            //            {
-            //                value = alternativeValue;
-            //            }
-            //        }
-            //    }
-
-            //    //result = FromAddress(fieldAddress, Heap);
-            //}
+            var value = getValueTypeField.GetValue(instance.ObjectAddress.Value, interior);
 
             var type = getValueTypeField.Type;
 
             if (!type.IsIntrinsic() && value != null)
             {
-                try
-                {
-                    type = instance.Heap.GetObjectType((ulong)value) ?? type;
-                }
-                catch (InvalidCastException e)
-                {
-                    Console.WriteLine(e);
-                }
+                // instance.Heap.GetObjectType may return null. WHY?
+                type = instance.Heap.GetObjectType((ulong)value) ?? type;
             }
 
-            var address = instance.ObjectAddress + (ulong)typeField.Offset;
+            if (value == null)
+            {
+                value = instance.ObjectAddress.Value + (ulong)typeField.Offset;
+            }
 
-            return new ClrFieldValue(typeField, new ClrInstance(value ?? address, address, instance.Heap, type, interior: value != null));
+            return new ClrFieldValue(typeField, new ClrInstance(instance.Heap, value, type, interior));
         }
 
+        /// <inheritdoc />
         public override string ToString()
         {
             return $"{Field.Name}: {Instance}";
-        }
-
-        private static bool IsReference(object result, ClrType type)
-        {
-            return result != null && !(result is string) && type.IsObjectReference;
         }
     }
 }
