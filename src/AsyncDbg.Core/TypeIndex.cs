@@ -27,7 +27,8 @@ namespace AsyncCausalityDebuggerNew
 
         public bool AddIfDerived(ClrType type)
         {
-            if (_derivedTypesAndRoot.Contains(type.BaseType))
+            if (_derivedTypesAndRoot.Contains(type.BaseType)
+                || (RootType?.IsInterface == true && type.Interfaces.Any(i => i.Name == RootType.Name)))
             {
                 return _derivedTypesAndRoot.Add(type);
             }

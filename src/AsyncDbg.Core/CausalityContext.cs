@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using AsyncCausalityDebugger;
 using AsyncDbgCore.New;
 using Microsoft.Diagnostics.Runtime;
@@ -12,6 +13,22 @@ namespace AsyncCausalityDebuggerNew
 {
     public class CausalityContext
     {
+
+        public static void FooBar<T>(T t) where T : object
+        {
+
+        }
+
+        public static void FooBar2()
+        {
+            string? s = null;
+            FooBar(s);
+            FooBar(42);
+
+            string s2 = "";
+            FooBar(s2);
+        }
+
         private readonly ConcurrentDictionary<ulong, CausalityNode> _nodesByAddress = new ConcurrentDictionary<ulong, CausalityNode>();
         private readonly Dictionary<int, ClrThread> _threadsById;
 
@@ -24,29 +41,54 @@ namespace AsyncCausalityDebuggerNew
 
         public TypesRegistry Registry { get; }
 
-        public ClrHeap Heap { get; }
+        public HeapContext Heap { get; }
 
-        public CausalityContext(ClrHeap heap)
+        public CausalityContext(HeapContext heapContext)
         {
-            Registry = TypesRegistry.Create(heap);
-            Heap = heap;
+            Registry = TypesRegistry.Create(heapContext);
+            Heap = heapContext;
 
-            _threadsById = heap.Runtime.Threads.ToDictionary(t => t.ManagedThreadId, t => t);
+            _threadsById = heapContext.DefaultHeap.Runtime.Threads.ToDictionary(t => t.ManagedThreadId, t => t);
+
+            var runtime = heapContext.DefaultHeap.Runtime;
+            foreach (var thread in runtime.Threads.Where(t => t.EnumerateStackTrace().Any()))
+            {
+                Console.WriteLine("### Thread {0}", thread.OSThreadId);
+                Console.WriteLine("Thread type: {0}",
+                    thread.IsBackground ? "Background"
+                    : thread.IsGC ? "GC"
+                    : "Foreground");
+                Console.WriteLine("");
+                Console.WriteLine("Stack trace:");
+                foreach (var stackFrame in thread.EnumerateStackTrace())
+                {
+                    Console.WriteLine("* {0}", stackFrame.DisplayString);
+                }
+            }
 
             foreach (var (instance, kind) in Registry.EnumerateRegistry())
             {
                 GetOrCreate(instance, kind);
             }
+
+            var items = runtime.ThreadPool.EnumerateManagedWorkItems().ToList();
+            Console.WriteLine("Done");
         }
+
+        
 
         public static CausalityContext LoadCausalityContextFromDump(string dumpPath)
         {
-            var target = DataTarget.LoadCrashDump(dumpPath);
-            var dacLocation = target.ClrVersions[0];
-            var runtime = dacLocation.CreateRuntime();
-            var heap = runtime.Heap;
+            HeapContext heapContext = new HeapContext(() =>
+            {
+                var target = DataTarget.LoadCrashDump(dumpPath);
+                var dacLocation = target.ClrVersions[0];
+                var runtime = dacLocation.CreateRuntime();
+                var heap = runtime.Heap;
+                return heap;
+            });
 
-            var context = new CausalityContext(heap);
+            var context = new CausalityContext(heapContext);
 
             context.Compute();
             return context;

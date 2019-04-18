@@ -14,7 +14,7 @@ namespace Test.AsyncCausalityInspector
         [Test]
         public void CheckTheDump()
         {
-            string path = @"E:\Dumps\UnhandledFailure.dmp";
+            string path = @"E:\Dumps\FromDmitry\BatmonService-MW1AAPE3AE9F979-27484-55d99747-c1fe-d35b-d6b0-ae122faa04a9.dmp";
             //string path = @"C:\Users\seteplia\AppData\Local\Temp\xunit.console (2).DMP";
 
             var contextNew = AsyncCausalityDebuggerNew.CausalityContext.LoadCausalityContextFromDump(path);

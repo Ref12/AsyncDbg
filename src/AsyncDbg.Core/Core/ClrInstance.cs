@@ -341,7 +341,8 @@ namespace AsyncCausalityDebuggerNew
                 if (typeField.Name == "<>u__1")
                 {
                     // TODO: what this is all about?
-                    continue;
+                    // TODO: Maybe not an issue anymore?
+                    //continue;
                 }
 
                 if (offsets.Add(typeField.Offset))

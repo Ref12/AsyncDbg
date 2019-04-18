@@ -6,6 +6,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using AsyncCausalityDebuggerNew;
 
@@ -51,12 +52,12 @@ namespace AsyncDbgCore.New
             return false;
         }
 
-        public static bool IsNotNull(this ClrInstance instance)
+        public static bool IsNotNull([NotNullWhenTrue]this ClrInstance? instance)
         {
             return instance != null && !instance.IsNull;
         }
 
-        public static bool IsNull(this ClrInstance instance) => !IsNotNull(instance);
+        public static bool IsNull([NotNullWhenFalse]this ClrInstance? instance) => !IsNotNull(instance);
 
         public static bool IsTaskWhenAll(this ClrInstance instance, CausalityContext context)
         {

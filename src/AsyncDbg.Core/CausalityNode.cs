@@ -84,6 +84,13 @@ namespace AsyncCausalityDebuggerNew
                         }
 
                         return false;
+                    case NodeKind.AsyncStateMachine:
+                        if (TaskInstance != null && TaskInstance.TryGetFieldValue("<>1__state")?.Instance?.Value.Equals((object)-2) == true)
+                        {
+                            return true;
+                        }
+
+                        return false;
                     case NodeKind.Thread:
                         return Dependencies.All(d => d.IsComplete) && Thread?.StackTraceLength == 0;
                     default:
@@ -96,14 +103,20 @@ namespace AsyncCausalityDebuggerNew
         {
             get
             {
+                if (Kind == NodeKind.AsyncStateMachine)
+                {
+                    return "ASM:" + (TaskInstance.TryGetFieldValue("<>1__state")?.Instance?.Value?.ToString() ?? "??");
+                }
                 if (ProcessingContinuations)
                 {
                     return nameof(ProcessingContinuations);
                 }
-                else
+                else if (IsTask)
                 {
                     return Status.ToString();
                 }
+
+                return Kind.ToString();
             }
         }
 
@@ -113,12 +126,15 @@ namespace AsyncCausalityDebuggerNew
         {
             Context = context;
             TaskInstance = task;
+
             Id = task.ValueOrDefault?.ToString() ?? string.Empty;
+            
             Kind = kind;
         }
 
         public void Link()
         {
+            
             if (Kind == NodeKind.AwaitTaskContinuation)
             {
                 ProcessContinuation(TaskInstance, isCurrentNode: true);
@@ -204,12 +220,19 @@ namespace AsyncCausalityDebuggerNew
                 }
             }
 
-            if (Kind == NodeKind.TaskCompletionSource)
+            if (Kind == NodeKind.AsyncStateMachine)
+            {
+                var awaitedTask = TaskInstance.TryGetFieldValue("<>u__1")?.Instance.TryGetFieldValue("m_task")?.Instance;
+                if (awaitedTask != null)
+                {
+                    AddDependency(awaitedTask);
+                }
+            }
+            else if (Kind == NodeKind.TaskCompletionSource)
             {
                 ProcessContinuation(TaskInstance, isCurrentNode: true);
             }
-
-            if (Kind == NodeKind.Task)
+            else if (Kind == NodeKind.Task)
             {
                 if (TaskInstance.IsTaskWhenAll(Context))
                 {
@@ -223,6 +246,17 @@ namespace AsyncCausalityDebuggerNew
 
                 ProcessContinuation(nextContinuation);
             }
+        }
+
+        private bool TryAddEdge(ClrInstance? continuation, bool asDependent = true)
+        {
+            if (continuation != null && Context.TryGetNodeFor(continuation, out var dependentNode))
+            {
+                    AddEdge(dependency: this, dependent: dependentNode);
+                return true;
+            }
+
+            return false;
         }
 
         private void ProcessContinuation(ClrInstance? nextContinuation, bool isCurrentNode = false)
@@ -253,7 +287,7 @@ namespace AsyncCausalityDebuggerNew
                         }
 
                         // m_stateMachine field is defined in AsyncMethodBuilderCore and in MoveNextRunner.
-                        var stateMachine = actionTarget["m_stateMachine"]?.Instance;
+                        var stateMachine = actionTarget.TryGetFieldValue("m_stateMachine")?.Instance;
                         if (stateMachine.IsNull())
                         {
                             continue;
@@ -416,7 +450,7 @@ namespace AsyncCausalityDebuggerNew
 
         public override string ToString()
         {
-            var result = $"({Dependencies.Count}, {Dependents.Count}) [{(IsTask ? DisplayStatus.ToString() : Kind.ToString())}] {TaskInstance?.ToString() ?? ""}";
+            var result = $"({Dependencies.Count}, {Dependents.Count}) [{DisplayStatus.ToString()}] {TaskInstance?.ToString() ?? ""}";
             if (Thread != null && (Dependencies.Count != 0 || Dependents.Count != 0))
             {
                 result += Environment.NewLine + string.Join(Environment.NewLine, Thread.StackTrace);

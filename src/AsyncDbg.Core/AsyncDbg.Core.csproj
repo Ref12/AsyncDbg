@@ -64,6 +64,7 @@
     <Compile Include="EnumerableExtensions.cs" />
     <Compile Include="Core\EqualityCompareres.cs" />
     <Compile Include="Core\HeapExtensions.cs" />
+    <Compile Include="HeapContext.cs" />
     <Compile Include="TaskContinuation.cs" />
     <Compile Include="InstanceWrappers\TaskInstanceHelpers.cs" />
     <Compile Include="TypeIndex.cs" />

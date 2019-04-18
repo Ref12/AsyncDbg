@@ -14,7 +14,8 @@ namespace AsyncCausalityDebuggerNew
 
     public class TypesRegistry
     {
-        private readonly ClrHeap _heap;
+        private ClrHeap _heap => _heapContext;
+        private readonly HeapContext _heapContext;
         private readonly ConcurrentDictionary<string, ClrType> _fullNameToClrTypeMap = new ConcurrentDictionary<string, ClrType>();
 
         // s_taskCompletionSentinel instances used to determine that task is completed.
@@ -40,11 +41,11 @@ namespace AsyncCausalityDebuggerNew
         public ClrType IAsyncStateMachineType { get; }
         public TypeIndex IAsyncStateMachineTypeIndex { get; }
 
-        private TypesRegistry(ClrHeap heap)
+        private TypesRegistry(HeapContext heapContext)
         {
-            _heap = heap;
-            ContinuationWrapperType = heap.GetTypeByName("System.Runtime.CompilerServices.AsyncMethodBuilderCore+ContinuationWrapper");
-            AsyncTaskMethodBuilderType = heap.GetTypeByName("System.Runtime.CompilerServices.AsyncTaskMethodBuilder");
+            _heapContext = heapContext;
+            ContinuationWrapperType = heapContext.DefaultHeap.GetTypeByName("System.Runtime.CompilerServices.AsyncMethodBuilderCore+ContinuationWrapper");
+            AsyncTaskMethodBuilderType = heapContext.DefaultHeap.GetTypeByName("System.Runtime.CompilerServices.AsyncTaskMethodBuilder");
 
             StandardTaskContinuationType =
                 GetClrTypeByFullName("System.Threading.Tasks.StandardTaskContinuation"); // This is ContinueWith continuation
@@ -72,7 +73,7 @@ namespace AsyncCausalityDebuggerNew
             
         }
 
-        public static TypesRegistry Create(ClrHeap heap)
+        public static TypesRegistry Create(HeapContext heap)
         {
             var result = new TypesRegistry(heap);
             result.Populate();
@@ -131,27 +132,46 @@ namespace AsyncCausalityDebuggerNew
             var sw = Stopwatch.StartNew();
 
             int counter = 0;
-            foreach (var obj in _heap.EnumerateObjectAddresses())
+
+            //var segmentHeaps = _heap.Segments.Select(s => _heapContext.CreateHeap()).ToList();
+
+            Parallel.For(0, _heap.Segments.Count, segmentIndex =>
             {
-                counter++;
-                if (counter % 10000 == 0)
-                {
-                    Console.WriteLine($"Analyzed {counter} objects");
-                }
+                //var thread = new Thread(() =>
+                //{
+                    var heap = _heapContext.CreateHeap();
+                    var segment = heap.Segments[segmentIndex];
 
-                var type = _heap.GetObjectType(obj);
-
-                foreach (var typeIndex in _typeIndices)
-                {
-                    if (typeIndex.ContainsType(type))
+                    foreach (var obj in segment.EnumerateObjectAddresses())
                     {
-                        var instance = ClrInstance.CreateInstance(_heap, obj, type);
-                        typeIndex.AddInstance(instance);
+                        var counterValue = Interlocked.Increment(ref counter);
+                        if (counterValue % 100000 == 0)
+                        {
+                            Console.WriteLine($"Analyzed {counterValue} objects");
+                        }
 
-                        break;
+                        var type = heap.GetObjectType(obj);
+
+                        foreach (var typeIndex in _typeIndices)
+                        {
+                            if (typeIndex.ContainsType(type))
+                            {
+                                var instance = ClrInstance.CreateInstance(heap, obj, type);
+                                lock (typeIndex)
+                                {
+                                    typeIndex.AddInstance(instance);
+                                }
+
+                                break;
+                            }
+                        }
                     }
-                }
-            }
+                //});
+
+                //thread.SetApartmentState(ApartmentState.MTA);
+                //thread.Start();
+                //thread.Join();
+            });
 
             Console.WriteLine($"Heap analysis is done by {sw.ElapsedMilliseconds}ms.");
         }
