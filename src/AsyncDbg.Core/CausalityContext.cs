@@ -29,6 +29,8 @@ namespace AsyncCausalityDebuggerNew
             FooBar(s2);
         }
 
+        public IEnumerable<CausalityNode> Nodes => _nodesByAddress.Values;
+
         private readonly ConcurrentDictionary<ulong, CausalityNode> _nodesByAddress = new ConcurrentDictionary<ulong, CausalityNode>();
         private readonly Dictionary<int, ClrThread> _threadsById;
 

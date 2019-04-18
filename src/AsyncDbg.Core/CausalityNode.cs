@@ -22,6 +22,9 @@ namespace AsyncCausalityDebuggerNew
         public readonly HashSet<CausalityNode> Dependencies = new HashSet<CausalityNode>();
         public readonly HashSet<CausalityNode> Dependents = new HashSet<CausalityNode>();
 
+        public HashSet<CausalityNode> WaitingOn => Dependencies;
+        public HashSet<CausalityNode> Unblocks => Dependents;
+
         public IEnumerable<CausalityNode> EnumerateDependentsAndSelf()
         {
             // Using queue to get depth first left to right traversal. Stack would give right to left traversal.
@@ -137,7 +140,7 @@ namespace AsyncCausalityDebuggerNew
             
             if (Kind == NodeKind.AwaitTaskContinuation)
             {
-                ProcessContinuation(TaskInstance, isCurrentNode: true);
+                ProcessUnblockedInstance(TaskInstance);
             }
             else if (Kind == NodeKind.SemaphoreSlim)
             {
@@ -222,15 +225,19 @@ namespace AsyncCausalityDebuggerNew
 
             if (Kind == NodeKind.AsyncStateMachine)
             {
+                FindSemaphores(TaskInstance);
+
                 var awaitedTask = TaskInstance.TryGetFieldValue("<>u__1")?.Instance.TryGetFieldValue("m_task")?.Instance;
                 if (awaitedTask != null)
                 {
                     AddDependency(awaitedTask);
                 }
+
+                ProcessUnblockedInstance(TaskInstance);
             }
             else if (Kind == NodeKind.TaskCompletionSource)
             {
-                ProcessContinuation(TaskInstance, isCurrentNode: true);
+                ProcessUnblockedInstance(TaskInstance);
             }
             else if (Kind == NodeKind.Task)
             {
@@ -244,7 +251,7 @@ namespace AsyncCausalityDebuggerNew
 
                 var nextContinuation = TaskInstance["m_continuationObject"].Instance;
 
-                ProcessContinuation(nextContinuation);
+                ProcessUnblockedInstance(nextContinuation);
             }
         }
 
@@ -259,8 +266,9 @@ namespace AsyncCausalityDebuggerNew
             return false;
         }
 
-        private void ProcessContinuation(ClrInstance? nextContinuation, bool isCurrentNode = false)
+        private void ProcessUnblockedInstance(ClrInstance? nextContinuation)
         {
+            bool isCurrentNode = nextContinuation == TaskInstance;
             bool nextIsCurrentNode = isCurrentNode;
             while (nextContinuation != null)
             {
@@ -272,29 +280,20 @@ namespace AsyncCausalityDebuggerNew
 
                 if (!continuation.IsNull)
                 {
+                    
                     if (!isCurrentNode && Context.TryGetNodeFor(continuation, out var dependentNode))
                     {
                         AddEdge(dependency: this, dependent: dependentNode);
                     }
-                    else if (continuation.IsOfType(typeof(System.Action), Context))
+                    else if (Kind == NodeKind.AsyncStateMachine)
                     {
-                        var actionTarget = continuation["_target"].Instance;
-                        if (actionTarget.IsOfType(Context.ContinuationWrapperType))
+                        if (!isCurrentNode)
                         {
-                            // Do we need to look at the m_innerTask field as well here?
-                            nextContinuation = actionTarget["m_continuation"].Instance;
-                            continue;
+                            // Only link to the task created by the async state machine. After that, no further continuations to process
+                            return;
                         }
 
-                        // m_stateMachine field is defined in AsyncMethodBuilderCore and in MoveNextRunner.
-                        var stateMachine = actionTarget.TryGetFieldValue("m_stateMachine")?.Instance;
-                        if (stateMachine.IsNull())
-                        {
-                            continue;
-                        }
-
-                        TargetInstance = stateMachine;
-                        FindSemaphores(stateMachine);
+                        var stateMachine = continuation;
 
                         if (stateMachine.TryGetFieldValue("<>t__builder", out var asyncMethodBuilderField))
                         {
@@ -323,9 +322,27 @@ namespace AsyncCausalityDebuggerNew
                             // In this case we mark the current instance as completed as well.
                             //if (Context.)
                         }
-                        else
+                    }
+                    else if (continuation.IsOfType(typeof(System.Action), Context))
+                    {
+                        var actionTarget = continuation["_target"].Instance;
+                        if (actionTarget.IsOfType(Context.ContinuationWrapperType))
                         {
+                            // Do we need to look at the m_innerTask field as well here?
+                            nextContinuation = actionTarget["m_continuation"].Instance;
+                            continue;
                         }
+
+                        // m_stateMachine field is defined in AsyncMethodBuilderCore and in MoveNextRunner.
+                        var stateMachine = actionTarget.TryGetFieldValue("m_stateMachine")?.Instance;
+                        if (stateMachine.IsNull())
+                        {
+                            continue;
+                        }
+
+                        //TargetInstance = stateMachine;
+
+                        
                     }
                     else if (continuation.IsOfType(Context.StandardTaskContinuationType) || Context.TaskCompletionSourceIndex.ContainsType(continuation.Type))
                     {
@@ -344,7 +361,7 @@ namespace AsyncCausalityDebuggerNew
                         for (int i = 0; i < size; i++)
                         {
                             var continuationItem = items[i];
-                            ProcessContinuation(continuationItem);
+                            ProcessUnblockedInstance(continuationItem);
                         }
                     }
                     else if (Context.AwaitTaskContinuationIndex.ContainsType(continuation.Type))
