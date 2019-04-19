@@ -39,14 +39,10 @@ namespace AsyncCausalityDebugger
             [XmlAttribute]
             public string Label;
 
-            [XmlIgnore]
-            public CausalityNode CausalityNode;
-
-            public Node(string id, string label, CausalityNode causalityNode)
+            public Node(string id, string label)
             {
                 Id = id;
                 Label = label;
-                CausalityNode = causalityNode;
             }
         }
 
@@ -105,10 +101,10 @@ namespace AsyncCausalityDebugger
                     if (filter(node))
                     {
                         //filteredOutNodes.Add(node.Id);
-                        foreach (var d in node.CausalityNode.EnumerateDependentsAndSelf())
-                        {
-                            filteredOutNodes.Add(d.Id);
-                        }
+                        //foreach (var d in node.CausalityNode.EnumerateDependentsAndSelf())
+                        //{
+                        //    filteredOutNodes.Add(d.Id);
+                        //}
                     }
                     else
                     {

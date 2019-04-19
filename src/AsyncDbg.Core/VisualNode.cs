@@ -14,9 +14,13 @@ namespace AsyncCausalityDebuggerNew
         public VisualContext Context { get; }
         public CausalityNode CausalityNode { get; }
 
-        public bool IsActive { get; set; } = true;
+        public bool IsActive { get; private set; } = true;
+
+        public string Id => CausalityNode.Id;
 
         public HashSet<CausalityNode> AssociatedNodes { get; } = new HashSet<CausalityNode>();
+
+        public HashSet<VisualNode> AssociatedVisualNodes { get; } = new HashSet<VisualNode>();
 
         public string DisplayString { get; set; }
 
@@ -27,6 +31,7 @@ namespace AsyncCausalityDebuggerNew
         {
             Context = context;
             CausalityNode = node;
+            AssociatedVisualNodes.Add(this);
             AssociatedNodes.Add(node);
         }
 
@@ -35,10 +40,28 @@ namespace AsyncCausalityDebuggerNew
             return DisplayString ?? CausalityNode.ToString();
         }
 
+        public void Activate()
+        {
+            IsActive = true;
+        }
+
+        public bool Deactivate()
+        {
+            if (!IsActive)
+            {
+                return false;
+            }
+
+            IsActive = false;
+            return true;
+        }
+
         public void Collapse(VisualNode other, string newDisplayString = null)
         {
             other.IsActive = false;
             DisplayString = newDisplayString ?? DisplayString;
+
+            AssociatedVisualNodes.UnionWith(other.AssociatedVisualNodes);
 
             foreach (var node in other.AssociatedNodes)
             {
@@ -49,13 +72,18 @@ namespace AsyncCausalityDebuggerNew
             {
                 node.WaitingOn.Remove(other);
                 node.WaitingOn.Add(this);
+                Unblocks.Add(node);
             }
 
             foreach (var node in other.WaitingOn)
             {
                 node.Unblocks.Remove(other);
                 node.Unblocks.Add(this);
+                WaitingOn.Add(node);
             }
+
+            Unblocks.ExceptWith(AssociatedVisualNodes);
+            WaitingOn.ExceptWith(AssociatedVisualNodes);
         }
     }
 

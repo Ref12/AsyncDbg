@@ -17,13 +17,44 @@ namespace AsyncCausalityDebuggerNew
         public CausalityNode? CompletionSourceTaskNode { get; private set; }
 
         public ThreadInstance? Thread { get; private set; }
-        public ClrInstance? TargetInstance { get; private set; }
+        public bool IsRoot => Dependents.Count == 0;
+        public bool IsLeaf => Dependencies.Count == 0;
 
         public readonly HashSet<CausalityNode> Dependencies = new HashSet<CausalityNode>();
         public readonly HashSet<CausalityNode> Dependents = new HashSet<CausalityNode>();
 
         public HashSet<CausalityNode> WaitingOn => Dependencies;
         public HashSet<CausalityNode> Unblocks => Dependents;
+
+        private bool AsyncMethodTask => Kind == NodeKind.Task && Dependencies.Count == 1 && Dependencies.First().Kind == NodeKind.AsyncStateMachine;
+
+
+        //public VisualNode CreateVisualNode()
+        //{
+        //    string id = Id;
+        //    string displayText = CreateDisplayText();
+
+        //    if (AsyncMethodTask)
+        //    {
+        //        displayText = "ASM";
+        //    }
+
+        //    return new VisualNode(id, displayText, this, Dependencies.First());
+        //}
+
+        private bool ShouldBeSkipped => Kind == NodeKind.AsyncStateMachine && Dependents.First().Kind == NodeKind.Task;
+
+        private string CreateDisplayText()
+        {
+            string prefix = $"({Dependencies.Count}, {Dependents.Count}) ";
+            string suffix = $"({Id})";
+
+
+            string mainText = ToString();
+
+
+            return $"{prefix} {mainText} {suffix}";
+        }
 
         public IEnumerable<CausalityNode> EnumerateDependentsAndSelf()
         {
@@ -41,6 +72,7 @@ namespace AsyncCausalityDebuggerNew
                 {
                     foreach (var n in next.Dependents)
                     {
+                        //if (!n.ShouldBeSkipped)
                         //foreach (var c in n)
                         {
                             queue.Enqueue(n);
@@ -62,12 +94,71 @@ namespace AsyncCausalityDebuggerNew
 
         }
 
+        //public IEnumerable<VisualNode> EnumerateDependencies()
+        //{
+        //    return EnumerateDependenciesAndSelf().Skip(1);
+        //}
+
+
+        //public IEnumerable<VisualNode> EnumerateDependenciesAndSelf()
+        //{
+        //    // Using queue to get depth first left to right traversal. Stack would give right to left traversal.
+        //    var queue = new Queue<CausalityNode>();
+
+        //    queue.Enqueue(this);
+
+        //    while (queue.Count > 0)
+        //    {
+        //        var next = queue.Dequeue();
+        //        if (!next.ShouldBeSkipped)
+        //        {
+        //            yield return next.CreateVisualNode();
+        //        }
+
+        //        //using (var listWrapper = next.Dependents)
+        //        {
+        //            foreach (var n in next.Dependencies)
+        //            {
+        //                //foreach (var c in n)
+        //                {
+        //                    queue.Enqueue(n);
+        //                }
+        //            }
+        //        }
+        //    }
+
+
+        //    IEnumerable<CausalityNode> enumerate(CausalityNode n)
+        //    {
+        //        yield return n;
+
+        //        foreach (var d in n.Dependencies)
+        //        {
+        //            yield return d;
+        //        }
+        //    }
+
+        //}
+
         public string Id { get; }
 
         private bool IsTask => Kind == NodeKind.Task;
         public NodeKind Kind { get; }
 
         private bool ProcessingContinuations { get; set; }
+
+        public int? StateMachineState
+        {
+            get
+            {
+                if (Kind != NodeKind.AsyncStateMachine)
+                {
+                    return null;
+                }
+
+                return TaskInstance?.TryGetFieldValue("<>1__state")?.Instance?.Value as int?;
+            }
+        }
 
         public bool IsComplete
         {
@@ -80,15 +171,8 @@ namespace AsyncCausalityDebuggerNew
                         return taskInstance.IsCompleted && !ProcessingContinuations;
                     case NodeKind.TaskCompletionSource:
                         return CompletionSourceTaskNode?.IsComplete == true;
-                    case NodeKind.AwaitTaskContinuation:
-                        if (TargetInstance != null && TargetInstance.TryGetFieldValue("<>1__state")?.Instance?.Value.Equals((object)-2) == true)
-                        {
-                            return true;
-                        }
-
-                        return false;
                     case NodeKind.AsyncStateMachine:
-                        if (TaskInstance != null && TaskInstance.TryGetFieldValue("<>1__state")?.Instance?.Value.Equals((object)-2) == true)
+                        if (StateMachineState == -2)
                         {
                             return true;
                         }
@@ -108,7 +192,26 @@ namespace AsyncCausalityDebuggerNew
             {
                 if (Kind == NodeKind.AsyncStateMachine)
                 {
-                    return "ASM:" + (TaskInstance.TryGetFieldValue("<>1__state")?.Instance?.Value?.ToString() ?? "??");
+                    var state = StateMachineState;
+                    var status = "??";
+                    switch (state)
+                    {
+                        case -1:
+                            status = "NotStarted";
+                            break;
+                        case -2:
+                            status = "Completed";
+                            break;
+                        default:
+                            break;
+                    }
+
+                    if (state >= 0)
+                    {
+                        status = state.ToString();
+                    }
+
+                    return "ASM:" + status;
                 }
                 if (ProcessingContinuations)
                 {
@@ -131,13 +234,16 @@ namespace AsyncCausalityDebuggerNew
             TaskInstance = task;
 
             Id = task.ValueOrDefault?.ToString() ?? string.Empty;
+            if (Id == "0")
+            {
+
+            }
             
             Kind = kind;
         }
 
         public void Link()
         {
-            
             if (Kind == NodeKind.AwaitTaskContinuation)
             {
                 ProcessUnblockedInstance(TaskInstance);
@@ -223,10 +329,12 @@ namespace AsyncCausalityDebuggerNew
                 }
             }
 
-            if (Kind == NodeKind.AsyncStateMachine)
+            if (Kind == NodeKind.AsyncStateMachine && StateMachineState >= 0)
             {
+                // TODO: should we look for semaphores for other cases as well?
                 FindSemaphores(TaskInstance);
 
+                // <>u__1 is an awaiter inside the state machine.
                 var awaitedTask = TaskInstance.TryGetFieldValue("<>u__1")?.Instance.TryGetFieldValue("m_task")?.Instance;
                 if (awaitedTask != null)
                 {
@@ -449,6 +557,12 @@ namespace AsyncCausalityDebuggerNew
 
         public void AddEdge(CausalityNode dependency, CausalityNode dependent)
         {
+            if (dependency == null || dependency.TaskInstance?.IsNull == true || dependent == null || dependency.TaskInstance?.IsNull == true)
+            {
+                // Can't add edge to nothing
+                return;
+            }
+
             if (dependency == dependent)
             {
                 // Avoiding self-references.
@@ -467,16 +581,15 @@ namespace AsyncCausalityDebuggerNew
 
         public override string ToString()
         {
-            var result = $"({Dependencies.Count}, {Dependents.Count}) [{DisplayStatus.ToString()}] {TaskInstance?.ToString() ?? ""}";
+            var result = $"(w{WaitingOn.Count}, u{Unblocks.Count}) [{DisplayStatus.ToString()}] {TaskInstance?.ToString() ?? ""}";
             if (Thread != null && (Dependencies.Count != 0 || Dependents.Count != 0))
             {
                 result += Environment.NewLine + string.Join(Environment.NewLine, Thread.StackTrace);
             }
 
-            if (TargetInstance != null)
-            {
-                result += Environment.NewLine + TargetInstance.ToString();
-            }
+            result = result.Replace("System.Threading.Tasks.", "");
+            result = result.Replace("System.Collections.Generic.", "");
+            result = result.Replace("System.Collections.Concurrent.", "");
 
             return result;
         }

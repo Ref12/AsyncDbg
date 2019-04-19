@@ -81,7 +81,7 @@ namespace AsyncCausalityDebuggerNew
             }
         }
 
-        public bool IsNull => ValueOrDefault == null;
+        public bool IsNull => ValueOrDefault == null || ValueOrDefault.Equals(0UL);
 
         public bool IsObject => IsNull || Type is null || !Type.IsIntrinsic();
 

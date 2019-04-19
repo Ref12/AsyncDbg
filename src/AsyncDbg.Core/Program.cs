@@ -75,9 +75,13 @@ namespace AsyncCausalityDebugger
         {
             //var dumpPath = args.Length > 0 ? args[0] : @"E:\Dumps\FromDmitry\BatmonService-MW1AAPE3AE9F979-27484-55d99747-c1fe-d35b-d6b0-ae122faa04a9.dmp";
             var dumpPath = args.Length > 0 ? args[0] : @"C:\Users\seteplia\AppData\Local\Temp\BasicDatastructures.DMP";
+            //var dumpPath = args.Length > 0 ? args[0] : @"E:\Dumps\xunit.console (2).DMP";
+
+            // "E:\Dumps\xunit.console (2).DMP"
             // C:\Users\seteplia\AppData\Local\Temp\BasicDatastructures.DMP
             var context = CausalityContext.LoadCausalityContextFromDump(dumpPath);
             context.SaveDgml(dumpPath + ".dgml");
+            return;
 
             string? line = null;
             while ((line = Console.ReadLine()) != null)

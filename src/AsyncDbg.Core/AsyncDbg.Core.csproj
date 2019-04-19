@@ -76,6 +76,7 @@
     <Compile Include="InstanceWrappers\TaskInstance.cs" />
     <Compile Include="InstanceWrappers\ThreadInstance.cs" />
     <Compile Include="VisualContext.cs" />
+    <Compile Include="VisualNode3.cs" />
     <Compile Include="VisualNode.cs" />
     <None Include="packages.config" />
   </ItemGroup>
