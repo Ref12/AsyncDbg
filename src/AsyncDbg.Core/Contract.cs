@@ -15,6 +15,14 @@ namespace AsyncDbgCore
             }
         }
 
+        public static void AssertNotNull<T>([EnsuresNotNull]T? o) where T : struct
+        {
+            if (o == null)
+            {
+                throw new System.InvalidOperationException("The value should not be null.");
+            }
+        }
+
         public static void Requires(bool predicate, string message)
         {
             if (!predicate)

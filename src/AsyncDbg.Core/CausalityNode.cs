@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AsyncDbgCore.New;
-using Microsoft.Diagnostics.Runtime;
 
 #nullable enable
 
@@ -28,30 +27,12 @@ namespace AsyncCausalityDebuggerNew
 
         private bool AsyncMethodTask => Kind == NodeKind.Task && Dependencies.Count == 1 && Dependencies.First().Kind == NodeKind.AsyncStateMachine;
 
-
-        //public VisualNode CreateVisualNode()
-        //{
-        //    string id = Id;
-        //    string displayText = CreateDisplayText();
-
-        //    if (AsyncMethodTask)
-        //    {
-        //        displayText = "ASM";
-        //    }
-
-        //    return new VisualNode(id, displayText, this, Dependencies.First());
-        //}
-
-        private bool ShouldBeSkipped => Kind == NodeKind.AsyncStateMachine && Dependents.First().Kind == NodeKind.Task;
-
         private string CreateDisplayText()
         {
             string prefix = $"({Dependencies.Count}, {Dependents.Count}) ";
             string suffix = $"({Id})";
 
-
             string mainText = ToString();
-
 
             return $"{prefix} {mainText} {suffix}";
         }
@@ -81,7 +62,6 @@ namespace AsyncCausalityDebuggerNew
                 }
             }
 
-
             IEnumerable<CausalityNode> enumerate(CausalityNode n)
             {
                 yield return n;
@@ -99,46 +79,40 @@ namespace AsyncCausalityDebuggerNew
         //    return EnumerateDependenciesAndSelf().Skip(1);
         //}
 
+        public IEnumerable<CausalityNode> EnumerateDependenciesAndSelfDepthFirst()
+        {
+            var enumeratedSet = new HashSet<CausalityNode>();
 
-        //public IEnumerable<VisualNode> EnumerateDependenciesAndSelf()
-        //{
-        //    // Using queue to get depth first left to right traversal. Stack would give right to left traversal.
-        //    var queue = new Queue<CausalityNode>();
+            // Using queue to get depth first left to right traversal. Stack would give right to left traversal.
+            // TODO: explain why depth first is so important!
+            var queue = new Stack<CausalityNode>();
 
-        //    queue.Enqueue(this);
+            queue.Push(this);
 
-        //    while (queue.Count > 0)
-        //    {
-        //        var next = queue.Dequeue();
-        //        if (!next.ShouldBeSkipped)
-        //        {
-        //            yield return next.CreateVisualNode();
-        //        }
+            while (queue.Count > 0)
+            {
+                var next = queue.Pop();
 
-        //        //using (var listWrapper = next.Dependents)
-        //        {
-        //            foreach (var n in next.Dependencies)
-        //            {
-        //                //foreach (var c in n)
-        //                {
-        //                    queue.Enqueue(n);
-        //                }
-        //            }
-        //        }
-        //    }
+                if (enumeratedSet.Contains(next))
+                {
+                    continue;
+                }
+
+                enumeratedSet.Add(next);
+                yield return next;
 
 
-        //    IEnumerable<CausalityNode> enumerate(CausalityNode n)
-        //    {
-        //        yield return n;
-
-        //        foreach (var d in n.Dependencies)
-        //        {
-        //            yield return d;
-        //        }
-        //    }
-
-        //}
+                {
+                    foreach (var n in next.Dependencies)
+                    {
+                        //foreach (var c in n)
+                        {
+                            queue.Push(n);
+                        }
+                    }
+                }
+            }
+        }
 
         public string Id { get; }
 

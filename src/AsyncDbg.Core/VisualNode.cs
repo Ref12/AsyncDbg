@@ -22,7 +22,7 @@ namespace AsyncCausalityDebuggerNew
 
         public HashSet<VisualNode> AssociatedVisualNodes { get; } = new HashSet<VisualNode>();
 
-        public string DisplayString { get; set; }
+        public string? DisplayString { get; set; }
 
         public HashSet<VisualNode> Unblocks { get; } = new HashSet<VisualNode>();
         public HashSet<VisualNode> WaitingOn { get; } = new HashSet<VisualNode>();
@@ -56,7 +56,7 @@ namespace AsyncCausalityDebuggerNew
             return true;
         }
 
-        public void Collapse(VisualNode other, string newDisplayString = null)
+        public void Collapse(VisualNode other, string? newDisplayString = null)
         {
             other.IsActive = false;
             DisplayString = newDisplayString ?? DisplayString;

@@ -2,8 +2,10 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using AsyncCausalityDebugger;
+using AsyncDbgCore;
 using AsyncDbgCore.New;
 using Microsoft.Diagnostics.Runtime;
 
@@ -13,28 +15,13 @@ namespace AsyncCausalityDebuggerNew
 {
     public class CausalityContext
     {
-
-        public static void FooBar<T>(T t) where T : object
-        {
-
-        }
-
-        public static void FooBar2()
-        {
-            string? s = null;
-            FooBar(s);
-            FooBar(42);
-
-            string s2 = "";
-            FooBar(s2);
-        }
-
         public IEnumerable<CausalityNode> Nodes => _nodesByAddress.Values;
 
         private readonly ConcurrentDictionary<ulong, CausalityNode> _nodesByAddress = new ConcurrentDictionary<ulong, CausalityNode>();
         private readonly Dictionary<int, ClrThread> _threadsById;
 
         public TypeIndex AwaitTaskContinuationIndex => Registry.AwaitTaskContinuationIndex;
+
         public TypeIndex TaskCompletionSourceIndex => Registry.TaskCompletionSourceIndex;
 
         public ClrType ContinuationWrapperType => Registry.ContinuationWrapperType;
@@ -52,32 +39,13 @@ namespace AsyncCausalityDebuggerNew
 
             _threadsById = heapContext.DefaultHeap.Runtime.Threads.ToDictionary(t => t.ManagedThreadId, t => t);
 
-            var runtime = heapContext.DefaultHeap.Runtime;
-            foreach (var thread in runtime.Threads.Where(t => t.EnumerateStackTrace().Any()))
-            {
-                Console.WriteLine("### Thread {0}", thread.OSThreadId);
-                Console.WriteLine("Thread type: {0}",
-                    thread.IsBackground ? "Background"
-                    : thread.IsGC ? "GC"
-                    : "Foreground");
-                Console.WriteLine("");
-                Console.WriteLine("Stack trace:");
-                foreach (var stackFrame in thread.EnumerateStackTrace())
-                {
-                    Console.WriteLine("* {0}", stackFrame.DisplayString);
-                }
-            }
-
             foreach (var (instance, kind) in Registry.EnumerateRegistry())
             {
                 GetOrCreate(instance, kind);
             }
 
-            var items = runtime.ThreadPool.EnumerateManagedWorkItems().ToList();
             Console.WriteLine("Done");
         }
-
-        
 
         public static CausalityContext LoadCausalityContextFromDump(string dumpPath)
         {
@@ -96,7 +64,7 @@ namespace AsyncCausalityDebuggerNew
             return context;
         }
 
-        public bool TryGetNodeFor(ClrInstance instance, out CausalityNode result)
+        public bool TryGetNodeFor(ClrInstance instance, [NotNullWhenTrue]out CausalityNode? result)
         {
             if (instance.ObjectAddress != null)
             {
@@ -111,10 +79,7 @@ namespace AsyncCausalityDebuggerNew
 
         public CausalityNode GetNode(ClrInstance instance)
         {
-            if (instance.IsNull)
-            {
-                return null;
-            }
+            Contract.AssertNotNull(instance.ObjectAddress);
 
             return _nodesByAddress.GetOrAdd(instance.ObjectAddress.Value, task => new CausalityNode(this, instance, kind: NodeKind.Unknown));
         }
@@ -201,66 +166,67 @@ namespace AsyncCausalityDebuggerNew
         public string SaveDgml(string filePath, bool whatIf = false)
         {
             var writer = new DgmlWriter();
-            //var roots = _nodesByAddress.Values.Where(n => n.Dependencies.Count != 0).ToArray();
-            var roots = _nodesByAddress.Values.Where(r => r.IsRoot).OrderBy(v => v.Id).ToArray();
 
-            var visualContext = VisualContext.Create(this);
-            foreach (var node in visualContext.ActiveNodes)
-            //foreach (var node in roots.OrderBy(v => v.Id))
+            bool useOld = false;
+
+            if (!useOld)
             {
-                //if (node.IsRoot && node.IsLeaf)
-                //{
-                //    continue;
-                //}
-                //if (node.Dependencies.Count == 0 && node.Dependents.Count == 0)
-                //{
-                //    continue;
-                //}
+                var asyncGraphs = VisualNew.VisualContext.Create(this);
 
-                //if (node.ToString().Contains("DBS.Tools.HashedPackage") || node.ToString().Contains("FetchHashedPackageDefinitionAsync"))
-                //{
-                //    continue;
-                //}
-
-                //if (node.ToString().Contains("SemaphoreSlimToken") && node.ToString().Contains("Wait"))
-                //{
-                //    continue;
-                //}
-
-                //if (node.ToString().Contains("Grpc.GrpcClient") && node.ToString().Contains("PinBatchAsync"))
-                //{
-                //    continue;
-                //}
-
-                //if (RanToCompletion(node))
-                //{
-                //    continue;
-                //}
-
-                //var visualNode = node.CreateVisualNode();
-                writer.AddNode(new DgmlWriter.Node(id: node.CausalityNode.Id, label: node.ToString()));
-                
-                //foreach (var dependency in node.Dependencies.OrderBy(d => d.Id))
-                foreach (var dependency in node.WaitingOn.OrderBy(d => d.Id))
+                foreach (var asyncGraph in asyncGraphs)
                 {
-                    writer.AddLink(new DgmlWriter.Link(
-                        source: node.Id,
-                        target: dependency.Id,
-                        label: null));
+                    foreach (var node in asyncGraph.EnumerateVisualNodes())
+                    {
+                        writer.AddNode(new DgmlWriter.Node(id: node.Id, label: node.DisplayText));
+
+                        //foreach (var dependency in node.Dependencies.OrderBy(d => d.Id))
+                        foreach (var dependency in node.AwaitsOn)
+                        {
+                            writer.AddLink(new DgmlWriter.Link(
+                                source: node.Id,
+                                target: dependency.Id,
+                                label: null));
+                        }
+                    }
                 }
-
-                //if (node.Kind == NodeKind.AwaitTaskContinuation)
-                //{
-                //    foreach (var dependency in node.Dependents.OrderBy(d => d.Id))
-                //    {
-                //        writer.AddLink(new DgmlWriter.Link(
-                //            source: dependency.Id,
-                //            target: node.Id,
-                //            label: null));
-                //    }
-                //}
             }
+            else
+            {
 
+
+                // Old
+                //var roots = _nodesByAddress.Values.Where(n => n.Dependencies.Count != 0).ToArray();
+                var roots = _nodesByAddress.Values.Where(r => r.IsRoot).OrderBy(v => v.Id).ToArray();
+
+                var visualContext = VisualContext.Create(this);
+                foreach (var node in visualContext.ActiveNodes)
+                //foreach (var node in roots.OrderBy(v => v.Id))
+                {
+
+                    //var visualNode = node.CreateVisualNode();
+                    writer.AddNode(new DgmlWriter.Node(id: node.CausalityNode.Id, label: node.ToString()));
+
+                    //foreach (var dependency in node.Dependencies.OrderBy(d => d.Id))
+                    foreach (var dependency in node.WaitingOn.OrderBy(d => d.Id))
+                    {
+                        writer.AddLink(new DgmlWriter.Link(
+                            source: node.Id,
+                            target: dependency.Id,
+                            label: null));
+                    }
+
+                    //if (node.Kind == NodeKind.AwaitTaskContinuation)
+                    //{
+                    //    foreach (var dependency in node.Dependents.OrderBy(d => d.Id))
+                    //    {
+                    //        writer.AddLink(new DgmlWriter.Link(
+                    //            source: dependency.Id,
+                    //            target: node.Id,
+                    //            label: null));
+                    //    }
+                    //}
+                }
+            }
 
             if (whatIf)
             {
