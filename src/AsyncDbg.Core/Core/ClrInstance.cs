@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using AsyncDbgCore;
+using AsyncDbg;
 using AsyncDbgCore.Core;
 using Microsoft.Diagnostics.Runtime;
 

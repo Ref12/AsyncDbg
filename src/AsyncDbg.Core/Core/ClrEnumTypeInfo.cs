@@ -7,6 +7,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using AsyncDbg;
 using Microsoft.Diagnostics.Runtime;
 
 namespace AsyncDbgCore.Core

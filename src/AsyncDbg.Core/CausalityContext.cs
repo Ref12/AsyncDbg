@@ -5,7 +5,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using AsyncCausalityDebugger;
-using AsyncDbgCore;
+using AsyncDbg;
 using AsyncDbgCore.New;
 using Microsoft.Diagnostics.Runtime;
 
@@ -192,8 +192,6 @@ namespace AsyncCausalityDebuggerNew
             }
             else
             {
-
-
                 // Old
                 //var roots = _nodesByAddress.Values.Where(n => n.Dependencies.Count != 0).ToArray();
                 var roots = _nodesByAddress.Values.Where(r => r.IsRoot).OrderBy(v => v.Id).ToArray();

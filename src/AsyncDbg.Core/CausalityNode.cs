@@ -308,8 +308,10 @@ namespace AsyncCausalityDebuggerNew
                 // TODO: should we look for semaphores for other cases as well?
                 FindSemaphores(TaskInstance);
 
+                var state = StateMachineState;
+                var awaitedTaskFieldName = $"<>u__{state + 1}";
                 // <>u__1 is an awaiter inside the state machine.
-                var awaitedTask = TaskInstance.TryGetFieldValue("<>u__1")?.Instance.TryGetFieldValue("m_task")?.Instance;
+                var awaitedTask = TaskInstance.TryGetFieldValue(awaitedTaskFieldName)?.Instance.TryGetFieldValue("m_task")?.Instance;
                 if (awaitedTask != null)
                 {
                     AddDependency(awaitedTask);
@@ -555,10 +557,12 @@ namespace AsyncCausalityDebuggerNew
 
         public override string ToString()
         {
-            var result = $"(w{WaitingOn.Count}, u{Unblocks.Count}) [{DisplayStatus.ToString()}] {TaskInstance?.ToString() ?? ""}";
+            var up = '\x2191';
+            var down = '\x2193';
+            var result = $"({up}:{WaitingOn.Count}, {down}:{Unblocks.Count}) [{DisplayStatus.ToString()}] {TaskInstance?.ToString() ?? ""}";
             if (Thread != null && (Dependencies.Count != 0 || Dependents.Count != 0))
             {
-                result += Environment.NewLine + string.Join(Environment.NewLine, Thread.StackTrace);
+                result += Environment.NewLine + Thread.ToString();
             }
 
             result = result.Replace("System.Threading.Tasks.", "");

@@ -49,10 +49,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CausalityNodes\ThreadNode.cs" />
     <Compile Include="Core\ClrEnumTypeInfo.cs" />
     <Compile Include="Contract.cs" />
     <Compile Include="Core\ClrEnumValue.cs" />
-    <Compile Include="AsyncStack.cs" />
     <Compile Include="Core\ClrInstanceExtensions.cs" />
     <Compile Include="Core\ClrTypeExtensions.cs" />
     <Compile Include="DgmlWriter.cs" />
@@ -76,8 +76,11 @@
     <Compile Include="InstanceWrappers\TaskInstance.cs" />
     <Compile Include="InstanceWrappers\ThreadInstance.cs" />
     <Compile Include="VisualContext.cs" />
-    <Compile Include="VisualNew\AsyncGraph.cs" />
-    <Compile Include="VisualNew\VisualNode.cs" />
+    <Compile Include="VisuaNodes\AsyncGraph.cs" />
+    <Compile Include="Utils\DictionaryExtensions.cs" />
+    <Compile Include="Utils\HashSetExtensions.cs" />
+    <Compile Include="VisuaNodes\VisualContext.cs" />
+    <Compile Include="VisuaNodes\VisualNode.cs" />
     <Compile Include="VisualNode.cs" />
     <None Include="packages.config" />
   </ItemGroup>

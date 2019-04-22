@@ -1,9 +1,9 @@
-﻿using System.Diagnostics;
+﻿using System;
 using System.Runtime.CompilerServices;
 
 #nullable enable
 
-namespace AsyncDbgCore
+namespace AsyncDbg
 {
     public static class Contract
     {
@@ -11,7 +11,7 @@ namespace AsyncDbgCore
         {
             if (o == null)
             {
-                throw new System.InvalidOperationException("The value should not be null.");
+                throw new InvalidOperationException("The value should not be null.");
             }
         }
 
@@ -19,7 +19,7 @@ namespace AsyncDbgCore
         {
             if (o == null)
             {
-                throw new System.InvalidOperationException("The value should not be null.");
+                throw new InvalidOperationException("The value should not be null.");
             }
         }
 
@@ -27,7 +27,7 @@ namespace AsyncDbgCore
         {
             if (!predicate)
             {
-                throw new System.Exception(message);
+                throw new Exception(message);
             }
         }
 
@@ -35,10 +35,18 @@ namespace AsyncDbgCore
         {
             if (value == null)
             {
-                throw new System.InvalidOperationException($"The value should not be null. {message}.");
+                throw new InvalidOperationException($"The value should not be null. {message}.");
             }
 
             return value;
+        }
+
+        public static void Assert(bool condition, string error)
+        {
+            if (!condition)
+            {
+                throw new InvalidOperationException($"Assertion violation: {error}.");
+            }
         }
     }
 }

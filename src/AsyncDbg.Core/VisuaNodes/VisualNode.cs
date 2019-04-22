@@ -1,19 +1,20 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using AsyncDbgCore;
+using AsyncCausalityDebuggerNew;
+using AsyncDbg.Utils;
 using static System.Environment;
 
 #nullable enable
 
-namespace AsyncCausalityDebuggerNew.VisualNew
+namespace AsyncDbg.VisuaNodes
 {
     public class VisualNode
     {
         // If visual node consists of multiple causality nodes,
         // then we need to track the last causality node that contains actual set of dependencies.
         private readonly CausalityNode _lastOrSingleCausalityNode;
-        private HashSet<VisualNode> _awaitsOn { get; } = new HashSet<VisualNode>();
+        private readonly HashSet<VisualNode> _awaitsOn = new HashSet<VisualNode>();
 
         public string Id { get; }
         public string DisplayText { get; }
@@ -42,10 +43,6 @@ namespace AsyncCausalityDebuggerNew.VisualNew
         {
             // TODO: add VisualMap type that will fail with more readable error message
             // when the indexer like visualMap[d] fails with key not found.
-            if (_lastOrSingleCausalityNode.Dependencies.Count > 1)
-            {
-
-            }
             _awaitsOn.AddRange(_lastOrSingleCausalityNode.Dependencies.Select(d => visualMap[d]));
         }
 

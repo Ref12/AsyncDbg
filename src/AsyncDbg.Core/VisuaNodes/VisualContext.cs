@@ -1,60 +1,13 @@
-using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using AsyncDbgCore;
+using AsyncCausalityDebuggerNew;
+using AsyncDbg.Utils;
 
 #nullable enable
 
-namespace AsyncCausalityDebuggerNew.VisualNew
+namespace AsyncDbg.VisuaNodes
 {
-    public static class DictionaryExtensions
-    {
-        public static T GetOrAdd<T, TKey>(this Dictionary<TKey, T> dictionary, TKey key, Func<TKey, T> func)
-        {
-            if (dictionary.TryGetValue(key, out var result))
-            {
-                return result;
-            }
-
-            result = func(key);
-            dictionary.Add(key, result);
-            return result;
-        }
-
-        public static void TryAddValue<TKey, TValue>(this Dictionary<TKey, TValue> dictionary, TKey key, TValue value)
-        {
-            if (!dictionary.ContainsKey(key))
-            {
-                dictionary.Add(key, value);
-            }
-        }
-
-        public static void TryAddRange<TKey, TValue>(this Dictionary<TKey, TValue> dictionary, IEnumerable<TKey> keys, TValue value)
-        {
-            foreach (var k in keys)
-            {
-                dictionary.TryAddValue(k, value);
-            }
-        }
-    }
-
-    public static class HashSetExtensions
-    {
-        public static void AddRange<T>(this HashSet<T> hashSet, IEnumerable<T> values)
-        {
-            foreach(var v in values)
-            {
-                hashSet.Add(v);
-            }
-        }
-
-        public static HashSet<T> ToHashSet<T>(this IEnumerable<T> sequence)
-        {
-            return new HashSet<T>(sequence);
-        }
-    }
-
     public class VisualContext
     {
         private readonly Dictionary<CausalityNode, VisualNode> _visualMap = new Dictionary<CausalityNode, VisualNode>();
@@ -63,7 +16,7 @@ namespace AsyncCausalityDebuggerNew.VisualNew
 
         private bool TryFindExistingAsyncGraph(IEnumerable<CausalityNode> nodes, [NotNullWhenTrue] out AsyncGraph? graph)
         {
-            foreach(var n in nodes)
+            foreach (var n in nodes)
             {
                 if (_nodeToAsyncGraphMap.TryGetValue(n, out graph))
                 {
@@ -107,13 +60,7 @@ namespace AsyncCausalityDebuggerNew.VisualNew
             // A -> B -> C -> D => (A,B,C) -> D
             //           | -> F          | -> F
 
-
             // Prepopulating CausalityNode -> VisualNode map.
-            //_ = root
-            //    .EnumerateDependenciesAndSelf()
-            //    .Select(n => map.GetOrAdd(n, node => VisualNode.Create(node)))
-            //    .ToList();
-
             var collapseable = new List<CausalityNode>();
             var allNodes = root.EnumerateDependenciesAndSelfDepthFirst().ToList();
 
@@ -141,7 +88,7 @@ namespace AsyncCausalityDebuggerNew.VisualNew
             // The last node in the dependency graph can be part of a collapsable subgraph.
             CreateCompositeVisualNode();
 
-            foreach(var visualNode in map.Values)
+            foreach (var visualNode in map.Values)
             {
                 visualNode.MaterializeDependencies(map);
             }
@@ -165,7 +112,7 @@ namespace AsyncCausalityDebuggerNew.VisualNew
 
             bool IsCollapseable(CausalityNode? previousNode, CausalityNode node)
             {
-                bool isCollapsable = node.Dependencies.Count <= 1 && node.Kind != NodeKind.Thread;
+                var isCollapsable = node.Dependencies.Count <= 1 && node.Kind != NodeKind.Thread;
                 return isCollapsable;
                 //return node.Dependencies.Count <= 1 &&
                 //    (node.Dependents.Count == 0 || node.Dependents.First().Dependencies.Count <= 1);
@@ -173,24 +120,12 @@ namespace AsyncCausalityDebuggerNew.VisualNew
 
             bool ShouldCollapse(CausalityNode? previousNode, CausalityNode node)
             {
-                bool shouldCollapse = node.Dependencies.Count > 1 || node.Dependents.Count > 1
-                    || (previousNode != null && !previousNode.Dependencies.Contains(node));
-            return shouldCollapse;
+                var shouldCollapse = node.Dependencies.Count > 1 || node.Dependents.Count > 1
+                    || previousNode != null && !previousNode.Dependencies.Contains(node);
+                return shouldCollapse;
                 //return node.Dependencies.Count <= 1 &&
                 //    (node.Dependents.Count == 0 || node.Dependents.First().Dependencies.Count <= 1);
             }
-        }
-
-        private VisualNode GetOrCreateVisualNode(CausalityNode causalityNode)
-        {
-            if (_visualMap.TryGetValue(causalityNode, out var result))
-            {
-                return result;
-            }
-
-            result = VisualNode.Create(causalityNode);
-            _visualMap.Add(causalityNode, result);
-            return result;
         }
 
         public static AsyncGraph[] Create(CausalityContext causalityContext)
@@ -208,63 +143,16 @@ namespace AsyncCausalityDebuggerNew.VisualNew
         private static bool IsRelevant(AsyncGraph graph)
         {
             var causalityNodes = graph.EnumerateCausalityNodes().ToHashSet();
-            if (causalityNodes.All(n => n.IsComplete))
+            // Filtering out empty graphs or fully completed ones.
+            // One cases that falls into this bucket is async state machines allocated in debug builds.
+            // In this case they're allocated, but useless becuase they're not even started.
+            // (Just a reminder, in debug builds state machines are classes and in release mode they're structs).
+            if (causalityNodes.All(n => n.IsComplete || n.IsRoot && n.IsLeaf))
             {
                 return false;
             }
 
             return true;
-        }
-    }
-
-    public class AsyncGraph
-    {
-        // Roots of the current async graph.
-        private readonly HashSet<VisualNode> _roots = new HashSet<VisualNode>();
-
-        public IEnumerable<CausalityNode> EnumerateCausalityNodes()
-        {
-            foreach(var root in _roots.SelectMany(r => r.CuasalityNodes))
-            {
-                foreach(var n in root.EnumerateDependenciesAndSelfDepthFirst())
-                {
-                    yield return n;
-                }
-            }
-        }
-
-        public bool HasVisualNodeWith(Func<VisualNode, bool> predicate)
-        {
-            return EnumerateVisualNodes().Any(predicate);
-        }
-
-        public IEnumerable<VisualNode> EnumerateVisualNodes()
-        {
-            foreach(var root in _roots)
-            {
-                foreach(var n in root.EnumerateAwaitsOnAndSelf())
-                {
-                    yield return n;
-                }
-            }
-        }
-
-        public AsyncGraph(VisualNode node)
-        {
-            _roots.Add(node);
-        }
-
-        public VisualNode[] Roots => _roots.ToArray();
-
-        public void AddRoot(VisualNode visualRoot)
-        {
-            _roots.Add(visualRoot);
-        }
-
-        public override string ToString()
-        {
-            // TODO: implement
-            return base.ToString();
         }
     }
 }
