@@ -7,6 +7,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using AsyncDbg;
+using AsyncDbg.Core;
 using Microsoft.Diagnostics.Runtime;
 
 #nullable enable
@@ -43,5 +45,7 @@ namespace AsyncDbgCore.Core
         {
             return actualTypes.Any(t => t.FullName == type.Name);
         }
+
+        public static string? TypeToString(this ClrType? type, TypesRegistry registry) => type == null ? null : new TypeNameHelper(registry).TypeToString(type);
     }
 }

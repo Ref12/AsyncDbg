@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using AsyncCausalityDebuggerNew;
+using AsyncDbg.Causality;
 using AsyncDbg.Utils;
 
 #nullable enable
@@ -11,6 +11,7 @@ namespace AsyncDbg.VisuaNodes
     public class VisualContext
     {
         private readonly Dictionary<CausalityNode, VisualNode> _visualMap = new Dictionary<CausalityNode, VisualNode>();
+
         // Each causaility node belongs only to one async graph. This map tracks this information.
         private readonly Dictionary<CausalityNode, AsyncGraph> _nodeToAsyncGraphMap = new Dictionary<CausalityNode, AsyncGraph>();
 
@@ -114,8 +115,6 @@ namespace AsyncDbg.VisuaNodes
             {
                 var isCollapsable = node.Dependencies.Count <= 1 && node.Kind != NodeKind.Thread;
                 return isCollapsable;
-                //return node.Dependencies.Count <= 1 &&
-                //    (node.Dependents.Count == 0 || node.Dependents.First().Dependencies.Count <= 1);
             }
 
             bool ShouldCollapse(CausalityNode? previousNode, CausalityNode node)
@@ -123,8 +122,6 @@ namespace AsyncDbg.VisuaNodes
                 var shouldCollapse = node.Dependencies.Count > 1 || node.Dependents.Count > 1
                     || previousNode != null && !previousNode.Dependencies.Contains(node);
                 return shouldCollapse;
-                //return node.Dependencies.Count <= 1 &&
-                //    (node.Dependents.Count == 0 || node.Dependents.First().Dependencies.Count <= 1);
             }
         }
 
@@ -149,6 +146,15 @@ namespace AsyncDbg.VisuaNodes
             // (Just a reminder, in debug builds state machines are classes and in release mode they're structs).
             if (causalityNodes.All(n => n.IsComplete || n.IsRoot && n.IsLeaf))
             {
+                return false;
+            }
+
+            var root = graph.Roots.FirstOrDefault()?.CausalityNodes.FirstOrDefault();
+            Contract.AssertNotNull(root);
+
+            if (root is TaskNode taskNode && taskNode.TaskKind == TaskKind.FromTaskCompletionSource)
+            {
+                // This is just a stand alone task completion source that is represented by two nodes: Task + TaskCompletionSource.
                 return false;
             }
 

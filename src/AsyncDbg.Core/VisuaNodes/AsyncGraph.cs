@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using AsyncCausalityDebuggerNew;
+using AsyncDbg.Causality;
 
 #nullable enable
 
@@ -14,7 +14,7 @@ namespace AsyncDbg.VisuaNodes
 
         public IEnumerable<CausalityNode> EnumerateCausalityNodes()
         {
-            foreach (var root in _roots.SelectMany(r => r.CuasalityNodes))
+            foreach (var root in _roots.SelectMany(r => r.CausalityNodes))
             {
                 foreach (var n in root.EnumerateDependenciesAndSelfDepthFirst())
                 {

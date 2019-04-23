@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using AsyncCausalityDebugger;
+﻿using System.IO;
+using AsyncDbg.Causality;
 using NUnit.Framework;
 
 namespace Test.AsyncCausalityInspector
@@ -27,7 +22,7 @@ namespace Test.AsyncCausalityInspector
 
         private void CheckDgmlGeneration(string dumpFilePath)
         {
-            var contextNew = AsyncCausalityDebuggerNew.CausalityContext.LoadCausalityContextFromDump(dumpFilePath);
+            var contextNew = CausalityContext.LoadCausalityContextFromDump(dumpFilePath);
             var dgmlPath = dumpFilePath + ".dgml";
             var newContent = contextNew.SaveDgml(dgmlPath, whatIf: true);
 

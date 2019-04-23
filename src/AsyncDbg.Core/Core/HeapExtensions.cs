@@ -5,7 +5,7 @@
 // --------------------------------------------------------------------
 
 using System.Collections.Generic;
-using AsyncCausalityDebuggerNew;
+using AsyncDbg.Core;
 using Microsoft.Diagnostics.Runtime;
 
 #nullable enable

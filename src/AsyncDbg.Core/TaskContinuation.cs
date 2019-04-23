@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using AsyncCausalityDebuggerNew;
 using AsyncDbg;
+using AsyncDbg.Core;
 
 #nullable enable
 

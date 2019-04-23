@@ -1,4 +1,4 @@
-﻿namespace AsyncCausalityDebuggerNew
+﻿namespace AsyncDbg
 {
     public enum NodeKind
     {

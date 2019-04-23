@@ -5,16 +5,20 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using AsyncCausalityDebuggerNew;
+using AsyncDbg.Core;
 using AsyncDbgCore.New;
 using Microsoft.Diagnostics.Runtime;
 
-namespace AsyncCausalityDebuggerNew
+#nullable enable
+
+namespace AsyncDbg
 {
-    #nullable enable
 
     public class TypesRegistry
     {
         private ClrHeap _heap => _heapContext;
+
         private readonly HeapContext _heapContext;
         private readonly ConcurrentDictionary<string, ClrType> _fullNameToClrTypeMap = new ConcurrentDictionary<string, ClrType>();
 
@@ -24,6 +28,7 @@ namespace AsyncCausalityDebuggerNew
         private readonly HashSet<TypeIndex> _typeIndices = new HashSet<TypeIndex>();
 
         private readonly HashSet<ClrType> _whenAllTypes;
+        private readonly ClrType _unwrapPromise;
 
         public TypeIndex TaskIndex { get; }
         public TypeIndex ValueTaskIndex { get; }
@@ -51,6 +56,7 @@ namespace AsyncCausalityDebuggerNew
                 GetClrTypeByFullName("System.Threading.Tasks.StandardTaskContinuation"); // This is ContinueWith continuation
             IAsyncStateMachineType =
                 GetClrTypeByFullName("System.Runtime.CompilerServices.IAsyncStateMachine");
+            _unwrapPromise = GetClrTypeByFullName("System.Threading.Tasks.UnwrapPromise");
 
             TaskIndex = CreateTypeIndex(NodeKind.Task);
             ValueTaskIndex = CreateTypeIndex(NodeKind.ValueTask);
@@ -70,7 +76,6 @@ namespace AsyncCausalityDebuggerNew
 
             // There are two "WhenAllPromise" types - one for Task<T>.WhenAll and another one for Task.WhenAll
             _whenAllTypes = TaskIndex.GetTypesByFullName("System.Threading.Tasks.Task+WhenAllPromise").ToHashSet(ClrTypeEqualityComparer.Instance);
-            
         }
 
         public static TypesRegistry Create(HeapContext heap)
@@ -87,10 +92,12 @@ namespace AsyncCausalityDebuggerNew
 
         public bool IsTask(ClrType? type) => type != null && TaskIndex.ContainsType(type);
 
+        public bool IsUnwrapPromise(ClrInstance task) => ClrTypeEqualityComparer.Instance.Equals(task?.Type, _unwrapPromise);
+
         public bool IsTaskCompletionSource(ClrType? type) => type != null && (TaskCompletionSourceIndex.ContainsType(type) || type.Name.Contains("TaskSourceSlim"));
 
         public bool IsSemaphoreWrapper(ClrType? type) => type != null && SemaphoreWrapperIndex.ContainsType(type);
-        
+
         public bool IsAsyncStateMachine(ClrType? type) => type != null && type.Interfaces.Any(i => i.Name == IAsyncStateMachineType.Name);
 
         /// <summary>
@@ -105,9 +112,6 @@ namespace AsyncCausalityDebuggerNew
 
         public bool IsInstanceOfType(ClrType type, Type systemType)
         {
-            type = type ?? throw new ArgumentNullException(nameof(type));
-            systemType = systemType ?? throw new ArgumentNullException(nameof(type));
-
             var clrType = GetClrTypeFor(systemType);
 
             // Does it make sense to add our own Type class?
@@ -131,46 +135,39 @@ namespace AsyncCausalityDebuggerNew
             Console.WriteLine("Analyzing the heap...");
             var sw = Stopwatch.StartNew();
 
-            int counter = 0;
+            var counter = 0;
 
             //var segmentHeaps = _heap.Segments.Select(s => _heapContext.CreateHeap()).ToList();
 
             Parallel.For(0, _heap.Segments.Count, segmentIndex =>
             {
-                //var thread = new Thread(() =>
-                //{
-                    var heap = _heapContext.CreateHeap();
-                    var segment = heap.Segments[segmentIndex];
+                var heap = _heapContext.CreateHeap();
+                var segment = heap.Segments[segmentIndex];
 
-                    foreach (var obj in segment.EnumerateObjectAddresses())
+                foreach (var obj in segment.EnumerateObjectAddresses())
+                {
+                    var counterValue = Interlocked.Increment(ref counter);
+                    if (counterValue % 100000 == 0)
                     {
-                        var counterValue = Interlocked.Increment(ref counter);
-                        if (counterValue % 100000 == 0)
-                        {
-                            Console.WriteLine($"Analyzed {counterValue} objects");
-                        }
+                        Console.WriteLine($"Analyzed {counterValue} objects");
+                    }
 
-                        var type = heap.GetObjectType(obj);
+                    var type = heap.GetObjectType(obj);
 
-                        foreach (var typeIndex in _typeIndices)
+                    foreach (var typeIndex in _typeIndices)
+                    {
+                        if (typeIndex.ContainsType(type))
                         {
-                            if (typeIndex.ContainsType(type))
+                            var instance = ClrInstance.CreateInstance(heap, obj, type);
+                            lock (typeIndex)
                             {
-                                var instance = ClrInstance.CreateInstance(heap, obj, type);
-                                lock (typeIndex)
-                                {
-                                    typeIndex.AddInstance(instance);
-                                }
-
-                                break;
+                                typeIndex.AddInstance(instance);
                             }
+
+                            break;
                         }
                     }
-                //});
-
-                //thread.SetApartmentState(ApartmentState.MTA);
-                //thread.Start();
-                //thread.Join();
+                }
             });
 
             Console.WriteLine($"Heap analysis is done by {sw.ElapsedMilliseconds}ms.");

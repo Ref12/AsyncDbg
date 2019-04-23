@@ -4,10 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AsyncDbg.CausalityNodes
+namespace AsyncDbg.Causality
 {
     public class ThreadNode
     {
-        
+
     }
 }

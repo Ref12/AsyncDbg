@@ -1,11 +1,11 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using AsyncDbg.Core;
 using Microsoft.Diagnostics.Runtime;
+#nullable enable
 
-namespace AsyncCausalityDebuggerNew
+namespace AsyncDbg
 {
-    #nullable enable
-
     public class TypeIndex
     {
         private readonly HashSet<ClrInstance> _instances = new HashSet<ClrInstance>(ClrInstanceAddressComparer.Instance);
@@ -16,7 +16,7 @@ namespace AsyncCausalityDebuggerNew
         public ClrType RootType { get; }
 
         public IReadOnlyCollection<ClrInstance> Instances => _instances;
-        
+
         public TypeIndex(ClrType rootType, NodeKind kind)
         {
             RootType = rootType;
@@ -28,7 +28,7 @@ namespace AsyncCausalityDebuggerNew
         public bool AddIfDerived(ClrType type)
         {
             if (_derivedTypesAndRoot.Contains(type.BaseType)
-                || (RootType?.IsInterface == true && type.Interfaces.Any(i => i.Name == RootType.Name)))
+                || RootType?.IsInterface == true && type.Interfaces.Any(i => i.Name == RootType.Name))
             {
                 return _derivedTypesAndRoot.Add(type);
             }

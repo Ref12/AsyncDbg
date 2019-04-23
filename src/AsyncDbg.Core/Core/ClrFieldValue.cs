@@ -1,4 +1,5 @@
 ﻿using System;
+using AsyncDbg.Core;
 using AsyncDbgCore.Core;
 using Microsoft.Diagnostics.Runtime;
 

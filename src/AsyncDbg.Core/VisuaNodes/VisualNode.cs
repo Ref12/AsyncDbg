@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using AsyncCausalityDebuggerNew;
+using AsyncDbg.Causality;
 using AsyncDbg.Utils;
 using static System.Environment;
 
@@ -19,7 +19,7 @@ namespace AsyncDbg.VisuaNodes
         public string Id { get; }
         public string DisplayText { get; }
 
-        public HashSet<CausalityNode> CuasalityNodes { get; }
+        public HashSet<CausalityNode> CausalityNodes { get; }
 
         public VisualNode(string id, string displayText, params CausalityNode[] nodes)
         {
@@ -28,15 +28,28 @@ namespace AsyncDbg.VisuaNodes
             Id = id;
             DisplayText = displayText;
             _lastOrSingleCausalityNode = nodes.Last();
-            CuasalityNodes = new HashSet<CausalityNode>(nodes);
+            CausalityNodes = new HashSet<CausalityNode>(nodes);
         }
 
         public static VisualNode Create(params CausalityNode[] nodes)
         {
             Contract.Requires(nodes.Length != 0, "nodes.Length != 0");
+
+            // Id of a visual node is Id of the first causality node,
+            // because dependent nodes are linked to the first node in the combined chain.
             var id = nodes[0].Id;
-            var text = string.Join($"{NewLine}|{NewLine}", nodes.Reverse().Select(n => n.ToString()));
-            return new VisualNode(id, text, nodes);
+            string displayText;
+
+            if (nodes.Length > 1)
+            {
+                displayText = string.Join($"{NewLine}|{NewLine}", nodes.Reverse().Where(n => n.Visible).Select(n => n.ToString()));
+            }
+            else
+            {
+                displayText = nodes[0].ToString();
+            }
+
+            return new VisualNode(id, displayText, nodes);
         }
 
         public void MaterializeDependencies(Dictionary<CausalityNode, VisualNode> visualMap)

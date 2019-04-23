@@ -3,15 +3,14 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using AsyncCausalityDebugger;
-using AsyncDbg;
-using AsyncDbgCore.New;
+using AsyncCausalityDebuggerNew;
+using AsyncDbg.Core;
 using Microsoft.Diagnostics.Runtime;
 
 #nullable enable
 
-namespace AsyncCausalityDebuggerNew
+namespace AsyncDbg.Causality
 {
     public class CausalityContext
     {
@@ -49,7 +48,7 @@ namespace AsyncCausalityDebuggerNew
 
         public static CausalityContext LoadCausalityContextFromDump(string dumpPath)
         {
-            HeapContext heapContext = new HeapContext(() =>
+            var heapContext = new HeapContext(() =>
             {
                 var target = DataTarget.LoadCrashDump(dumpPath);
                 var dacLocation = target.ClrVersions[0];
@@ -81,7 +80,7 @@ namespace AsyncCausalityDebuggerNew
         {
             Contract.AssertNotNull(instance.ObjectAddress);
 
-            return _nodesByAddress.GetOrAdd(instance.ObjectAddress.Value, task => new CausalityNode(this, instance, kind: NodeKind.Unknown));
+            return _nodesByAddress.GetOrAdd(instance.ObjectAddress.Value, task => CausalityNode.Create(this, instance, kind: NodeKind.Unknown));
         }
 
         public bool TryGetNodeAt(ulong address, out CausalityNode result)
@@ -98,7 +97,7 @@ namespace AsyncCausalityDebuggerNew
 
             //var node = _nodes.GetOrAdd(instance, task => new CausalityNode(this, task, kind: kind));
             //_nodesByAddress.GetOrAdd(node.TaskInstance.ObjectAddress.Value, node);
-            var node = _nodesByAddress.GetOrAdd(instance.ObjectAddress.Value, _ => new CausalityNode(this, instance, kind: kind));
+            var node = _nodesByAddress.GetOrAdd(instance.ObjectAddress.Value, _ => CausalityNode.Create(this, instance, kind: kind));
 
             return node;
         }
@@ -113,7 +112,7 @@ namespace AsyncCausalityDebuggerNew
 
         public string OverallStats(string filePath)
         {
-            var list = new List<AsyncStack>();
+            //var list = new List<AsyncStack>();
 
             var roots = _nodesByAddress.Values.Where(n => n.Dependencies.Count == 0).ToArray();
             //foreach (var node in _nodesByAddress.Values.OrderBy(v => v.Id))
@@ -131,7 +130,7 @@ namespace AsyncCausalityDebuggerNew
 
             //    writer.AddNode(new DgmlWriter.Node(id: node.Id, label: node.ToString()));
 
-                
+
             //    foreach (var dependency in node.Dependencies.OrderBy(d => d.Id))
             //    {
             //        writer.AddLink(new DgmlWriter.Link(
@@ -167,11 +166,11 @@ namespace AsyncCausalityDebuggerNew
         {
             var writer = new DgmlWriter();
 
-            bool useOld = false;
+            var useOld = false;
 
             if (!useOld)
             {
-                var asyncGraphs = VisualNew.VisualContext.Create(this);
+                var asyncGraphs = VisuaNodes.VisualContext.Create(this);
 
                 foreach (var asyncGraph in asyncGraphs)
                 {

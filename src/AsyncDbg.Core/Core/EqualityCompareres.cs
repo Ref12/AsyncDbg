@@ -1,10 +1,12 @@
 ﻿using System.Collections.Generic;
+using AsyncDbg.Core;
 using Microsoft.Diagnostics.Runtime;
 
 #nullable enable
-namespace AsyncCausalityDebuggerNew
+
+namespace AsyncDbg.Core
 {
-    class ClrInstanceAddressComparer : EqualityComparer<ClrInstance>
+    internal class ClrInstanceAddressComparer : EqualityComparer<ClrInstance>
     {
         public static readonly ClrInstanceAddressComparer Instance = new ClrInstanceAddressComparer();
 
@@ -24,12 +26,12 @@ namespace AsyncCausalityDebuggerNew
         }
     }
 
-    class ClrTypeEqualityComparer : EqualityComparer<ClrType?>
+    internal class ClrTypeEqualityComparer : EqualityComparer<ClrType?>
     {
         public static readonly ClrTypeEqualityComparer Instance = new ClrTypeEqualityComparer();
         public override bool Equals(ClrType? x, ClrType? y)
         {
-            return ((x?.MetadataToken == y?.MetadataToken) || (x?.Name == y?.Name)) && x?.Module.FileName == y?.Module.FileName;
+            return (x?.MetadataToken == y?.MetadataToken || x?.Name == y?.Name) && x?.Module.FileName == y?.Module.FileName;
         }
 
         public override int GetHashCode(ClrType? obj)

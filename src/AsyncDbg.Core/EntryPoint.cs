@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Linq;
-using AsyncCausalityDebuggerNew;
+using AsyncDbg.Core;
 using Microsoft.Diagnostics.Runtime;
 
 namespace AsyncDbgCore.New

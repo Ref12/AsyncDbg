@@ -6,6 +6,8 @@ using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using AsyncDbg;
+using AsyncDbg.Core;
 using AsyncDbgCore.Core;
 using Microsoft.Diagnostics.Runtime;
 using static System.Environment;

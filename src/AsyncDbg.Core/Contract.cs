@@ -7,20 +7,24 @@ namespace AsyncDbg
 {
     public static class Contract
     {
-        public static void AssertNotNull([EnsuresNotNull]object? o)
+        public static object AssertNotNull([EnsuresNotNull]object? o)
         {
             if (o == null)
             {
                 throw new InvalidOperationException("The value should not be null.");
             }
+
+            return o;
         }
 
-        public static void AssertNotNull<T>([EnsuresNotNull]T? o) where T : struct
+        public static T AssertNotNull<T>([EnsuresNotNull]T? o) where T : struct
         {
             if (o == null)
             {
                 throw new InvalidOperationException("The value should not be null.");
             }
+
+            return o.Value;
         }
 
         public static void Requires(bool predicate, string message)

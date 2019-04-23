@@ -8,11 +8,13 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using AsyncCausalityDebuggerNew;
+using AsyncDbg;
+using AsyncDbg.Causality;
+using AsyncDbg.Core;
 
 namespace AsyncDbgCore.New
 {
-    #nullable enable
+#nullable enable
 
     public static class ClrInstanceExtensions
     {
@@ -31,7 +33,7 @@ namespace AsyncDbgCore.New
             return registry.IsInstanceOfType(instance.Type, type);
         }
 
-        public static bool IsOfType(this ClrInstance instance, AsyncCausalityDebuggerNew.TypeIndex typeIndex)
+        public static bool IsOfType(this ClrInstance instance, TypeIndex typeIndex)
         {
             if (instance.Type == null)
             {

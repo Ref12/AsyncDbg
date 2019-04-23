@@ -49,15 +49,19 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CausalityNodes\ThreadNode.cs" />
+    <Compile Include="Causality\AsyncStateMachineNode.cs" />
+    <Compile Include="Causality\TaskCompletionSourceNode.cs" />
+    <Compile Include="Causality\TaskNode.cs" />
+    <Compile Include="Causality\ThreadNode.cs" />
     <Compile Include="Core\ClrEnumTypeInfo.cs" />
     <Compile Include="Contract.cs" />
     <Compile Include="Core\ClrEnumValue.cs" />
     <Compile Include="Core\ClrInstanceExtensions.cs" />
     <Compile Include="Core\ClrTypeExtensions.cs" />
+    <Compile Include="Core\TypeNameHelper.cs" />
     <Compile Include="DgmlWriter.cs" />
-    <Compile Include="CausalityContext.cs" />
-    <Compile Include="CausalityNode.cs" />
+    <Compile Include="Causality\CausalityContext.cs" />
+    <Compile Include="Causality\CausalityNode.cs" />
     <Compile Include="Core\ClrFieldValue.cs" />
     <Compile Include="Core\ClrInstance.cs" />
     <Compile Include="EntryPoint.cs" />

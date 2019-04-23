@@ -1,26 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using AsyncCausalityDebuggerNew;
 using AsyncDbg;
 using AsyncDbgCore.Core;
 using Microsoft.Diagnostics.Runtime;
 
 #nullable enable
 
-namespace AsyncCausalityDebuggerNew
+namespace AsyncDbg.Core
 {
-    //public class ClrObjectInstance : ClrInstance
-    //{
-
-    //}
-
-    //public class ClrValueInstance : ClrInstance
-    //{
-
-    //}
-
     /// <todoc />
     //[DebuggerTypeProxy(typeof(ClrInstanceDynamicProxy))]
     public class ClrInstance
@@ -169,7 +159,7 @@ namespace AsyncCausalityDebuggerNew
                 else
                 {
                     var values = new List<ClrEnumValue>();
-                    long bits = Convert.ToInt64(ValueOrDefault);
+                    var bits = Convert.ToInt64(ValueOrDefault);
                     foreach (var enumValue in info.Values)
                     {
                         if ((enumValue.Value & bits) == enumValue.Value)
@@ -182,7 +172,7 @@ namespace AsyncCausalityDebuggerNew
                 }
             }
 
-            bool isObject = IsObject;
+            var isObject = IsObject;
 
             ClrType? primitiveTypeOptional = null;
             if (!isObject || type?.IsValueClass == true)
@@ -231,7 +221,11 @@ namespace AsyncCausalityDebuggerNew
         /// <inheritdoc />
         public override string ToString()
         {
-            //return IsObject ? $"{Type?.Name} ({Value ?? "null"})" : Value.ToString();
+            return ToString(registry: null);
+        }
+
+        public string ToString(TypesRegistry? registry)
+        {
             // For some weird reason String is not an object!
             if (Type?.IsString == true)
             {
@@ -245,7 +239,8 @@ namespace AsyncCausalityDebuggerNew
 
             if (IsObject)
             {
-                return $"{Type?.Name} ({ValueOrDefault})";
+                string? typeName = registry != null ? Type?.TypeToString(registry) : Type?.Name;
+                return $"{typeName} ({ValueOrDefault})";
             }
 
             if (ValueOrDefault == null)
@@ -255,7 +250,7 @@ namespace AsyncCausalityDebuggerNew
 
             Contract.AssertNotNull(Type);
 
-            string suffix = string.Empty;
+            var suffix = string.Empty;
             if (Type.IsOfTypes(typeof(long), typeof(ulong)))
             {
                 suffix = "L";
@@ -281,7 +276,7 @@ namespace AsyncCausalityDebuggerNew
             var length = Type.GetArrayLength(address);
             var items = new ClrInstance[length];
             var elementType = Type.ComponentType;
-            for (int i = 0; i < length; i++)
+            for (var i = 0; i < length; i++)
             {
                 var tmp = GetElementAt(i);
 
