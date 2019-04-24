@@ -19,6 +19,9 @@ namespace AsyncDbg.Causality
         /// <inheritdoc />
         public override bool IsComplete => StateMachineState == -2;
 
+        /// <inheritdoc />
+        public override bool Visible => false;
+
         public int StateMachineState
         {
             get
@@ -46,7 +49,7 @@ namespace AsyncDbg.Causality
         }
 
         /// <inheritdoc />
-        public override void AddEdge(CausalityNode dependency, CausalityNode dependent)
+        protected override void AddEdge(CausalityNode dependency, CausalityNode dependent)
         {
             if (dependent is TaskNode taskNode && dependency == this)
             {
@@ -54,8 +57,10 @@ namespace AsyncDbg.Causality
                 _underlyingTask = taskNode;
                 taskNode.SetAsyncStateMachine(this);
             }
-
-            base.AddEdge(dependency, dependent);
+            //else
+            {
+                base.AddEdge(dependency, dependent);
+            }
         }
 
         /// <inheritdoc />

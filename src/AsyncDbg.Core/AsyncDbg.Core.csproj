@@ -51,6 +51,7 @@
   <ItemGroup>
     <Compile Include="Causality\AsyncStateMachineNode.cs" />
     <Compile Include="Causality\TaskCompletionSourceNode.cs" />
+    <Compile Include="Causality\AwaitTaskContinuationNode.cs" />
     <Compile Include="Causality\TaskNode.cs" />
     <Compile Include="Causality\ThreadNode.cs" />
     <Compile Include="Core\ClrEnumTypeInfo.cs" />

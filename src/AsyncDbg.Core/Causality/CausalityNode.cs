@@ -131,6 +131,7 @@ namespace AsyncDbg.Causality
                 NodeKind.Task => new TaskNode(context, clrInstance),
                 NodeKind.TaskCompletionSource => new TaskCompletionSourceNode(context, clrInstance),
                 NodeKind.AsyncStateMachine => new AsyncStateMachineNode(context, clrInstance),
+                NodeKind.AwaitTaskContinuation => new AwaitTaskContinuationNode(context, clrInstance),
                 _ => new CausalityNode(context, clrInstance, kind),
             };
         }
@@ -438,17 +439,17 @@ namespace AsyncDbg.Causality
             }
         }
 
-        public void AddDependency(ClrInstance dependency)
+        protected void AddDependency(ClrInstance dependency)
         {
             AddEdge(dependency: _context.GetNode(dependency), dependent: this);
         }
 
-        public void AddDependent(ClrInstance dependent)
+        protected void AddDependent(ClrInstance dependent)
         {
             AddEdge(dependency: this, dependent: _context.GetNode(dependent));
         }
 
-        public virtual void AddEdge(CausalityNode dependency, CausalityNode dependent)
+        protected virtual void AddEdge(CausalityNode dependency, CausalityNode dependent)
         {
             if (dependency == null || dependency.ClrInstance?.IsNull == true || dependent == null || dependency.ClrInstance?.IsNull == true)
             {

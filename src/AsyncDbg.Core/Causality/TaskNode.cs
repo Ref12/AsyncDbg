@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AsyncCausalityDebuggerNew;
 using AsyncDbg.Core;
+using AsyncDbgCore.Core;
 using AsyncDbgCore.New;
 
 #nullable enable
@@ -13,6 +14,12 @@ namespace AsyncDbg.Causality
 {
     public class TaskNode : CausalityNode
     {
+        /// <summary>
+        /// Optional synchronization context attached to a current task node.
+        /// The field is not null if the task represents an async operation that runs within a sync context.
+        /// </summary>
+        private ClrInstance? _syncContext;
+
         [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
         private readonly TaskInstance _taskInstance;
 
@@ -21,7 +28,6 @@ namespace AsyncDbg.Causality
 
         // Not null if the task originates from async state machine.
         private CausalityNode? _asyncStateMachine;
-
 
         public TaskNode(CausalityContext context, ClrInstance task)
             : base(context, task, NodeKind.Task)
@@ -72,8 +78,8 @@ namespace AsyncDbg.Causality
 
         public ClrInstance ContinuationObject => ClrInstance["m_continuationObject"].Instance;
 
-        /// <inheritdoc />
-        public override bool Visible => TaskKind <= TaskKind.VisibleTaskKind;
+        ///// <inheritdoc />
+        //public override bool Visible => TaskKind <= TaskKind.VisibleTaskKind;
 
         /// <inheritdoc />
         public override bool IsComplete => _taskInstance.IsCompleted && !ProcessingContinuations;
@@ -92,16 +98,37 @@ namespace AsyncDbg.Causality
             _asyncStateMachine = asyncStateMachine;
         }
 
+        protected override void AddEdge(CausalityNode dependency, CausalityNode dependent)
+        {
+            if (dependency == this && dependent is AwaitTaskContinuationNode await && await.SyncContext != null)
+            {
+                // Saving it and not adding as an edge to simplify visualization.
+                _syncContext = await.SyncContext;
+            }
+            else
+            {
+                base.AddEdge(dependency, dependent);
+            }
+        }
+
         /// <inhertidoc />
         protected override string ToStringCore()
         {
-            return TaskKind switch
+            var result = TaskKind switch
             {
                 TaskKind.FromTaskCompletionSource => Contract.AssertNotNull(_taskCompletionSource).ToString(),
+                TaskKind.AsyncTask => Contract.AssertNotNull(_asyncStateMachine).ToString(),
                 TaskKind.WhenAll => $"{InsAndOuts()} {ClrInstance.ToString(Types)}",
                 TaskKind.TaskRun => $"{InsAndOuts()} Task.Run ({ClrInstance.ObjectAddress})",
                 _ => base.ToStringCore(),
             };
+
+            if (_syncContext != null)
+            {
+                result += $"{Environment.NewLine}(with sync context: {_syncContext.Type?.TypeToString(Types)})";
+            }
+
+            return result;
         }
     }
 

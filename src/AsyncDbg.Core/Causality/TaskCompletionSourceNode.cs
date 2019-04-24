@@ -25,8 +25,10 @@ namespace AsyncDbg.Causality
             }
         }
 
+        public override bool Visible => false;
+
         /// <inheritdoc />
-        public override void AddEdge(CausalityNode dependency, CausalityNode dependent)
+        protected override void AddEdge(CausalityNode dependency, CausalityNode dependent)
         {
             Contract.Assert(dependent.Kind == NodeKind.Task, "Only tasks can directly depend on TaskCompletionSource instances");
             Contract.Assert(dependency.Kind == NodeKind.TaskCompletionSource, "dependency must be TaskCompletionSource");
