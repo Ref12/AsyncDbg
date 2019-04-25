@@ -140,7 +140,7 @@ namespace AsyncDbg.Causality
             }
             else if (this is ThreadNode threadNode)
             {
-                foreach (var stackObject in threadNode.ClrThread.EnumerateStackObjects())
+                foreach (var stackObject in threadNode.EnumerateStackObjects())
                 {
                     var so = stackObject;
 
