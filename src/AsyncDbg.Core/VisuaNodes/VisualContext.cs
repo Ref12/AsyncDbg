@@ -127,7 +127,7 @@ namespace AsyncDbg.VisuaNodes
 
         public static AsyncGraph[] Create(CausalityContext causalityContext)
         {
-            var roots = causalityContext.Nodes.Where(n => n.IsRoot).ToList();
+            var roots = causalityContext.Nodes.Where(n => n.IsRoot && !n.IsLeaf).ToList();
 
             var visualContext = new VisualContext();
 

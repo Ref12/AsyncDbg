@@ -39,12 +39,22 @@ namespace AsyncDbg.Causality
                     return null;
                 }
 
-                // If an async method awaits for multiple task types, then the generated state machine
-                // would have more then one task awaiter in a form <>u__num.
-                // To determine which task the state machine awaits on computing the awaiter based on the current state.
-                var awaitedTaskFieldName = $"<>u__{StateMachineState + 1}";
+                // Async state machine could have more then one task awaiter, and in order to find the right one
+                // we just look for all <>u__ fields that have non-default value of task awaiter.
 
-                return ClrInstance.TryGetFieldValue(awaitedTaskFieldName)?.Instance.TryGetFieldValue("m_task")?.Instance;
+                foreach (var field in ClrInstance.Fields)
+                {
+                    if (field.Field.Name.StartsWith("<>u__"))
+                    {
+                        var taskInstance = field.Instance.TryGetFieldValue("m_task")?.Instance;
+                        if (taskInstance?.IsNull == false)
+                        {
+                            return taskInstance;
+                        }
+                    }
+                }
+
+                return null;
             }
         }
 

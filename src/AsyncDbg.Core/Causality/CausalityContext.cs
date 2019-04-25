@@ -43,7 +43,7 @@ namespace AsyncDbg.Causality
                 GetOrCreate(instance, kind);
             }
 
-            Console.WriteLine("Done");
+            Console.WriteLine("Successfully loaded clr instances.");
         }
 
         public static CausalityContext LoadCausalityContextFromDump(string dumpPath)
@@ -59,6 +59,7 @@ namespace AsyncDbg.Causality
 
             var context = new CausalityContext(heapContext);
 
+            Console.WriteLine("Linking the nodes together.");
             context.Compute();
             return context;
         }
@@ -167,7 +168,7 @@ namespace AsyncDbg.Causality
             var writer = new DgmlWriter();
 
             var useOld = false;
-
+            Console.WriteLine("Analyzing the async graphs...");
             if (!useOld)
             {
                 var asyncGraphs = VisuaNodes.VisualContext.Create(this);

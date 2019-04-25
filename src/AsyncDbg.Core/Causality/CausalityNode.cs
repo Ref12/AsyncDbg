@@ -210,6 +210,11 @@ namespace AsyncDbg.Causality
                 // TODO: should we look for semaphores for other cases as well?
                 FindSemaphores(ClrInstance);
 
+                if (asyncStateMachine.Id == "2698324257464" || asyncStateMachine.Id == "2717653543152")
+                {
+
+                }
+
                 var awaitedTask = asyncStateMachine.AwaitedTask;
                 if (awaitedTask != null)
                 {
