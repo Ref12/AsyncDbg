@@ -1,8 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
-using AsyncDbgCore;
 
-namespace AsyncCausalityDebuggerNew
+namespace AsyncDbg.InstanceWrappers
 {
     internal static class TaskInstanceHelpers
     {
@@ -74,7 +73,7 @@ namespace AsyncCausalityDebuggerNew
 
         public static TaskCreationOptions GetCreationOptions(TaskCreationOptions options)
         {
-            return options & (TaskCreationOptions)(~InternalTaskOptions.InternalOptionsMask);
+            return options & (TaskCreationOptions)~InternalTaskOptions.InternalOptionsMask;
         }
 
         public static TaskCreationOptions GetOptions(int stateFlags)

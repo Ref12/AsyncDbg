@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using AsyncCausalityDebuggerNew;
 using AsyncDbg.Core;
+using AsyncDbg.InstanceWrappers;
 using AsyncDbgCore.Core;
 using AsyncDbgCore.New;
 
@@ -46,7 +46,7 @@ namespace AsyncDbg.Causality
                     return TaskKind.FromTaskCompletionSource;
 
                 if (_asyncStateMachine != null)
-                    return TaskKind.AsyncTask;
+                    return TaskKind.AsyncMethodTask;
 
                 if (Types.IsTaskWhenAll(ClrInstance))
                     return TaskKind.WhenAll;
@@ -117,7 +117,7 @@ namespace AsyncDbg.Causality
             var result = TaskKind switch
             {
                 TaskKind.FromTaskCompletionSource => Contract.AssertNotNull(_taskCompletionSource).ToString(),
-                TaskKind.AsyncTask => Contract.AssertNotNull(_asyncStateMachine).ToString(),
+                TaskKind.AsyncMethodTask => Contract.AssertNotNull(_asyncStateMachine).ToString(),
                 TaskKind.WhenAll => $"{InsAndOuts()} {ClrInstance.ToString(Types)}",
                 TaskKind.TaskRun => $"{InsAndOuts()} Task.Run ({ClrInstance.ObjectAddress})",
                 _ => base.ToStringCore(),
@@ -145,8 +145,7 @@ namespace AsyncDbg.Causality
         TaskRun,
         WhenAll,
         FromTaskCompletionSource,
-        TaskWrapper,
-        AsyncTask,
+        AsyncMethodTask,
         VisibleTaskKind = WhenAll
     }
 }

@@ -68,12 +68,12 @@ namespace AsyncDbg.VisuaNodes
             CausalityNode? previousNode = null;
             foreach (var node in root.EnumerateDependenciesAndSelfDepthFirst())
             {
-                if (collapseable.Count != 0 && ShouldCollapse(previousNode, node))
+                if (collapseable.Count != 0 && shouldCollapse(previousNode, node))
                 {
-                    CreateCompositeVisualNode();
+                    createCompositeVisualNode();
                 }
 
-                if (IsCollapseable(previousNode, node))
+                if (isCollapseable(previousNode, node))
                 {
                     collapseable.Add(node);
                 }
@@ -87,7 +87,7 @@ namespace AsyncDbg.VisuaNodes
             }
 
             // The last node in the dependency graph can be part of a collapsable subgraph.
-            CreateCompositeVisualNode();
+            createCompositeVisualNode();
 
             foreach (var visualNode in map.Values)
             {
@@ -97,7 +97,7 @@ namespace AsyncDbg.VisuaNodes
             var result = map[root];
             return result;
 
-            void CreateCompositeVisualNode()
+            void createCompositeVisualNode()
             {
                 if (collapseable.Count == 0)
                 {
@@ -111,13 +111,13 @@ namespace AsyncDbg.VisuaNodes
                 collapseable.Clear();
             }
 
-            bool IsCollapseable(CausalityNode? previousNode, CausalityNode node)
+            bool isCollapseable(CausalityNode? previousNode, CausalityNode node)
             {
                 var isCollapsable = node.Dependencies.Count <= 1 && node.Kind != NodeKind.Thread;
                 return isCollapsable;
             }
 
-            bool ShouldCollapse(CausalityNode? previousNode, CausalityNode node)
+            bool shouldCollapse(CausalityNode? previousNode, CausalityNode node)
             {
                 var shouldCollapse = node.Dependencies.Count > 1 || node.Dependents.Count > 1
                     || previousNode != null && !previousNode.Dependencies.Contains(node);

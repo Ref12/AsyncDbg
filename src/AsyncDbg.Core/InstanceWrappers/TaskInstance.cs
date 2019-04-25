@@ -1,9 +1,9 @@
 ﻿using System.Threading.Tasks;
 using AsyncDbg.Core;
-using static AsyncCausalityDebuggerNew.TaskInstanceHelpers;
+using static AsyncDbg.InstanceWrappers.TaskInstanceHelpers;
 #nullable enable
 
-namespace AsyncCausalityDebuggerNew
+namespace AsyncDbg.InstanceWrappers
 {
     /// <summary>
     /// Wrapper around <see cref="ClrInstance"/> that mimics an actual interface of <see cref="Task"/> class.
@@ -20,7 +20,7 @@ namespace AsyncCausalityDebuggerNew
 
         public TaskStatus Status => GetStatus(StateFlags);
 
-        public int Id => (int)(_instance["m_taskId"].Instance.Value);
+        public int Id => (int)_instance["m_taskId"].Instance.Value;
 
         public bool IsCompleted => (StateFlags & TASK_STATE_COMPLETED_MASK) != 0;
 
@@ -32,6 +32,6 @@ namespace AsyncCausalityDebuggerNew
 
         public TaskCreationOptions Options => GetCreationOptions(OptionsMethod(StateFlags));
 
-        private int StateFlags => (int)(_instance["m_stateFlags"].Instance.Value);
+        private int StateFlags => (int)_instance["m_stateFlags"].Instance.Value;
     }
 }

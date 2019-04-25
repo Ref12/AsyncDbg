@@ -50,6 +50,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Causality\AsyncStateMachineNode.cs" />
+    <Compile Include="Causality\EnhancedStackTrace.cs" />
+    <Compile Include="Causality\ManualResetEventSlimNode.cs" />
     <Compile Include="Causality\TaskCompletionSourceNode.cs" />
     <Compile Include="Causality\AwaitTaskContinuationNode.cs" />
     <Compile Include="Causality\TaskNode.cs" />
@@ -79,7 +81,6 @@
     <Compile Include="NodeKind.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="InstanceWrappers\TaskInstance.cs" />
-    <Compile Include="InstanceWrappers\ThreadInstance.cs" />
     <Compile Include="VisualContext.cs" />
     <Compile Include="VisuaNodes\AsyncGraph.cs" />
     <Compile Include="Utils\DictionaryExtensions.cs" />

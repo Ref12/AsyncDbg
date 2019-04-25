@@ -22,7 +22,7 @@ namespace AsyncCausalityDebuggerNew
 
         public VisualContext(CausalityContext causalityContext)
         {
-            this.CausalityContext = causalityContext;
+            CausalityContext = causalityContext;
         }
 
         public VisualNode AddNode(CausalityNode node)
