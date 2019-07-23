@@ -39,7 +39,7 @@ namespace AsyncDbg.Causality
         public HashSet<CausalityNode> WaitingOn => Dependencies;
         public HashSet<CausalityNode> Unblocks => Dependents;
 
-        private string CreateDisplayText()
+        public string CreateDisplayText()
         {
             var prefix = $"({Dependencies.Count}, {Dependents.Count}) ";
             var suffix = $"({Id})";

@@ -15,6 +15,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using AsyncCausalityDebugger;
+using AsyncDbg.Causality;
 
 namespace AsyncCausalityViewer
 {
@@ -33,9 +34,9 @@ namespace AsyncCausalityViewer
             var context = await RunStaAsync(() =>
             {
                 var result = CausalityContext.LoadCausalityContextFromDump(null);
-                foreach (var node in result.Nodes.Values)
+                foreach (var node in result.Nodes)
                 {
-                    var displayString = node.DisplayString;
+                    var displayString = node.CreateDisplayText();
                 }
 
                 return result;

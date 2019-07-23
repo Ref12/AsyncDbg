@@ -13,6 +13,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using AsyncCausalityDebugger;
+using AsyncDbg.Causality;
 using Microsoft.Msagl.Drawing;
 using Microsoft.Msagl.WpfGraphControl;
 using Color = Microsoft.Msagl.Drawing.Color;
@@ -38,7 +39,7 @@ namespace AsyncCausalityViewer
         {
             Graph graph = new Graph();
 
-            foreach (var node in context.Nodes.Values)
+            foreach (var node in context.Nodes)
             {
                 if (node.Dependencies.Count == 0 && node.Dependents.Count == 0)
                 {
@@ -46,7 +47,7 @@ namespace AsyncCausalityViewer
                 }
 
                 var graphNode = graph.AddNode(node.Id);
-                graphNode.LabelText = node.DisplayString;
+                graphNode.LabelText = node.CreateDisplayText();
 
                 foreach (var dependency in node.Dependencies)
                 {
