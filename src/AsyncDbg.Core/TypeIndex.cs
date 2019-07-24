@@ -27,6 +27,12 @@ namespace AsyncDbg
 
         public bool AddIfDerived(ClrType type)
         {
+            // exception when getting metadata reader for .winmd files
+            if (type.Module.IsFile && type.Module.FileName.EndsWith(".winmd", System.StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
             if (_derivedTypesAndRoot.Contains(type.BaseType)
                 || RootType?.IsInterface == true && type.Interfaces.Any(i => i.Name == RootType.Name))
             {
