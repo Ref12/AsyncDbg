@@ -139,7 +139,13 @@ namespace AsyncDbg
 
             //var segmentHeaps = _heap.Segments.Select(s => _heapContext.CreateHeap()).ToList();
 
-            Parallel.For(0, _heap.Segments.Count, segmentIndex =>
+            // failing to cast to IDebugSystemObjects3 with parallel (race condition?)
+            var parallelOptions = new ParallelOptions
+            {
+                MaxDegreeOfParallelism = 1
+            };
+
+            Parallel.For(0, _heap.Segments.Count, parallelOptions, segmentIndex =>
             {
                 var heap = _heapContext.CreateHeap();
                 var segment = heap.Segments[segmentIndex];
