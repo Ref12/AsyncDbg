@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace AsyncDbg.InstanceWrappers
 {
-    internal static class TaskInstanceHelpers
+    public static class TaskInstanceHelpers
     {
         // State constants for m_stateFlags;
         // The bits of m_stateFlags are allocated as follows:

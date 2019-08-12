@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using AsyncCausalityDebuggerNew;
 using AsyncDbg;
 using AsyncDbgCore.Core;
 using Microsoft.Diagnostics.Runtime;

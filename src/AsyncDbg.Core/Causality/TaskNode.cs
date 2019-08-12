@@ -76,7 +76,19 @@ namespace AsyncDbg.Causality
             }
         }
 
-        public ClrInstance ContinuationObject => ClrInstance["m_continuationObject"].Instance;
+        public ClrInstance ContinuationObject
+        {
+            get
+            {
+                var continuationObject = ClrInstance["m_continuationObject"].Instance;
+                if (continuationObject.IsNotNull())
+                {
+                    return continuationObject;
+                }
+
+                return ClrInstance["m_action"].Instance;
+            }
+        }
 
         ///// <inheritdoc />
         //public override bool Visible => TaskKind <= TaskKind.VisibleTaskKind;

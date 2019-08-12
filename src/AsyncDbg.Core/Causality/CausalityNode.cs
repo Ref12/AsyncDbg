@@ -237,6 +237,12 @@ namespace AsyncDbg.Causality
                     }
                 }
 
+                var parent = taskNode.ClrInstance["m_parent"].Instance;
+                if (parent.IsNotNull())
+                {
+                    AddDependent(parent);
+                }
+
                 ProcessUnblockedInstance(taskNode.ContinuationObject);
             }
         }
@@ -266,7 +272,6 @@ namespace AsyncDbg.Causality
 
                 if (!continuation.IsNull)
                 {
-
                     if (!isCurrentNode && _context.TryGetNodeFor(continuation, out var dependentNode))
                     {
                         AddEdge(dependency: this, dependent: dependentNode);

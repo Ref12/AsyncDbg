@@ -1,17 +1,18 @@
 ﻿using System;
-using AsyncDbg.Core;
 using AsyncDbgCore.Core;
 using Microsoft.Diagnostics.Runtime;
 
-namespace AsyncCausalityDebuggerNew
+#nullable enable
+
+namespace AsyncDbg.Core
 {
     /// <summary>
     /// Represents a field of an object with its value.
     /// </summary>
     public sealed class ClrFieldValue
     {
-        public ClrInstanceField Field { get; } // NotNull
-        public ClrInstance Instance { get; } // NotNull, Instance.IsNull may be true.
+        public ClrInstanceField Field { get; }
+        public ClrInstance Instance { get; }
 
         private ClrFieldValue(ClrInstanceField field, ClrInstance instance)
         {
@@ -19,11 +20,8 @@ namespace AsyncCausalityDebuggerNew
             Instance = instance ?? throw new ArgumentNullException(nameof(instance));
         }
 
-        internal static ClrFieldValue Create(ClrInstanceField typeField, ClrInstance instance, bool interior)
+        internal static ClrFieldValue? Create(ClrInstanceField typeField, ClrInstance instance, bool interior)
         {
-            var getValueTypeField = typeField ?? throw new ArgumentNullException(nameof(typeField));
-            instance = instance ?? throw new ArgumentNullException(nameof(instance));
-
             if (typeField.Type.MetadataToken == 0 && typeField.Type.Name == "ERROR")
             {
                 return null;
@@ -31,9 +29,18 @@ namespace AsyncCausalityDebuggerNew
                 //throw new NotSupportedException();
             }
 
-            var value = getValueTypeField.GetValue(instance.ObjectAddress.Value, interior);
+            Contract.AssertNotNull(instance.ObjectAddress);
 
-            var type = getValueTypeField.Type;
+            object? value = null;
+            try
+            {
+                // This code could fail with NRE with no obvious reason.
+                value = typeField.GetValue(instance.ObjectAddress.Value, interior);
+            }
+            catch(Exception)
+            { }
+
+            var type = typeField.Type;
 
             if (!type.IsIntrinsic() && value != null)
             {
