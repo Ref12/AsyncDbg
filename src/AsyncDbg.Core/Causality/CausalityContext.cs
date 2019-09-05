@@ -2,7 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
+using System.Diagnostics.CodeAnalysis;
 using AsyncCausalityDebugger;
 using AsyncCausalityDebuggerNew;
 using AsyncDbg.Core;
@@ -64,7 +64,7 @@ namespace AsyncDbg.Causality
             return context;
         }
 
-        public bool TryGetNodeFor(ClrInstance instance, [NotNullWhenTrue]out CausalityNode? result)
+        public bool TryGetNodeFor(ClrInstance instance, [NotNullWhen(true)]out CausalityNode? result)
         {
             if (instance.ObjectAddress != null)
             {
@@ -171,59 +171,25 @@ namespace AsyncDbg.Causality
             Console.WriteLine("Analyzing the async graphs...");
             if (!useOld)
             {
-                var asyncGraphs = VisuaNodes.VisualContext.Create(this);
+                var visualContext = VisuaNodes.VisualContext.Create(this);
 
-                foreach (var asyncGraph in asyncGraphs)
+                foreach (var node in visualContext.EnumerateVisualNodes())
                 {
-                    foreach (var node in asyncGraph.EnumerateVisualNodes())
-                    {
-                        writer.AddNode(new DgmlWriter.Node(id: node.Id, label: node.DisplayText));
-
-                        //foreach (var dependency in node.Dependencies.OrderBy(d => d.Id))
-                        foreach (var dependency in node.AwaitsOn)
-                        {
-                            writer.AddLink(new DgmlWriter.Link(
-                                source: node.Id,
-                                target: dependency.Id,
-                                label: null));
-                        }
-                    }
-                }
-            }
-            else
-            {
-                // Old
-                //var roots = _nodesByAddress.Values.Where(n => n.Dependencies.Count != 0).ToArray();
-                var roots = _nodesByAddress.Values.Where(r => r.IsRoot).OrderBy(v => v.Id).ToArray();
-
-                var visualContext = VisualContext.Create(this);
-                foreach (var node in visualContext.ActiveNodes)
-                //foreach (var node in roots.OrderBy(v => v.Id))
-                {
-
-                    //var visualNode = node.CreateVisualNode();
-                    writer.AddNode(new DgmlWriter.Node(id: node.CausalityNode.Id, label: node.ToString()));
+                    writer.AddNode(new DgmlWriter.Node(id: node.Id, label: node.DisplayText));
 
                     //foreach (var dependency in node.Dependencies.OrderBy(d => d.Id))
-                    foreach (var dependency in node.WaitingOn.OrderBy(d => d.Id))
+                    foreach (var dependency in node.AwaitsOn)
                     {
                         writer.AddLink(new DgmlWriter.Link(
                             source: node.Id,
                             target: dependency.Id,
                             label: null));
                     }
-
-                    //if (node.Kind == NodeKind.AwaitTaskContinuation)
-                    //{
-                    //    foreach (var dependency in node.Dependents.OrderBy(d => d.Id))
-                    //    {
-                    //        writer.AddLink(new DgmlWriter.Link(
-                    //            source: dependency.Id,
-                    //            target: node.Id,
-                    //            label: null));
-                    //    }
-                    //}
                 }
+            }
+            else
+            {
+                throw new NotSupportedException("The version code is no longer supported!");
             }
 
             if (whatIf)

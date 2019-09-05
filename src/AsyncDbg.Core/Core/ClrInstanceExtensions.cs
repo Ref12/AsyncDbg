@@ -6,7 +6,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using AsyncDbg;
 using AsyncDbg.Causality;

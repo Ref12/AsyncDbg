@@ -226,7 +226,7 @@ namespace AsyncDbg
             return GetClrTypeByFullName(fullName);
         }
 
-        private ClrType GetClrTypeByFullName(string fullName)
+        private ClrType? GetClrTypeByFullName(string fullName)
         {
             return _fullNameToClrTypeMap.GetOrAdd(fullName, fullTypeName =>
             {

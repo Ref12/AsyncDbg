@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using AsyncDbg.Core;
 using AsyncDbg.InstanceWrappers;
 using AsyncDbgCore.Core;
 using AsyncDbgCore.New;
+using Codex.Utilities;
 
 #nullable enable
 
@@ -22,6 +24,7 @@ namespace AsyncDbg.Causality
         public ClrInstance ClrInstance { get; }
 
         public CausalityNode? CompletionSourceTaskNode { get; private set; }
+        public Lazy<Guid> Key { get; }
 
         public bool IsRoot => Dependents.Count == 0;
         public bool IsLeaf => Dependencies.Count == 0;
@@ -39,6 +42,30 @@ namespace AsyncDbg.Causality
         public HashSet<CausalityNode> WaitingOn => Dependencies;
         public HashSet<CausalityNode> Unblocks => Dependents;
 
+        protected CausalityNode(CausalityContext context, ClrInstance clrInstance, NodeKind kind)
+        {
+            _context = context;
+            ClrInstance = clrInstance;
+
+            Id = clrInstance.ValueOrDefault?.ToString() ?? string.Empty;
+            Kind = kind;
+            Key = new Lazy<Guid>(() => ComputeKey());
+        }
+
+        public static CausalityNode Create(CausalityContext context, ClrInstance clrInstance, NodeKind kind)
+        {
+            return kind switch
+            {
+                NodeKind.Task => new TaskNode(context, clrInstance),
+                NodeKind.TaskCompletionSource => new TaskCompletionSourceNode(context, clrInstance),
+                NodeKind.AsyncStateMachine => new AsyncStateMachineNode(context, clrInstance),
+                NodeKind.AwaitTaskContinuation => new AwaitTaskContinuationNode(context, clrInstance),
+                NodeKind.Thread => new ThreadNode(context, clrInstance),
+                NodeKind.ManualResetEventSlim => new ManualResetEventSlimNode(context, clrInstance),
+                _ => new CausalityNode(context, clrInstance, kind),
+            };
+        }
+
         public string CreateDisplayText()
         {
             var prefix = $"({Dependencies.Count}, {Dependents.Count}) ";
@@ -50,6 +77,27 @@ namespace AsyncDbg.Causality
         }
 
         public IEnumerable<CausalityNode> EnumerateDependenciesAndSelfDepthFirst()
+        {
+            return EnumerateNeighborsAndSelfDepthFirst(n => n.Dependencies);
+        }
+
+        public IEnumerable<CausalityNode> EnumerateNeighborsAndSelfDepthFirst()
+        {
+            return EnumerateNeighborsAndSelfDepthFirst(n => n.Dependencies.Concat(n.Dependents));
+        }
+
+        public Guid ComputeKey()
+        {
+            Murmur3 murmur = new Murmur3();
+            var bytes = Encoding.UTF8.GetBytes(ClrInstance.AddressRegex.Replace(ToString(), ""));
+
+            var dependencies = EnumerateDependenciesAndSelfDepthFirst();
+            var hash = dependencies.Select(t => Encoding.UTF8.GetBytes(ClrInstance.AddressRegex.Replace(t.ToString(), "")));
+            // Hash dependencies nodes and normalized display text for self
+            return murmur.ComputeHash(hash.Select(ba => new ArraySegment<byte>(ba))).AsGuid();
+        }
+
+        public IEnumerable<CausalityNode> EnumerateNeighborsAndSelfDepthFirst(Func<CausalityNode, IEnumerable<CausalityNode>> getNeighbors)
         {
             var enumeratedSet = new HashSet<CausalityNode>();
 
@@ -71,7 +119,7 @@ namespace AsyncDbg.Causality
                 enumeratedSet.Add(next);
                 yield return next;
 
-                foreach (var n in next.Dependencies)
+                foreach (var n in getNeighbors(next))
                 {
                     queue.Push(n);
                 }
@@ -97,29 +145,6 @@ namespace AsyncDbg.Causality
 
                 return Kind.ToString();
             }
-        }
-
-        protected CausalityNode(CausalityContext context, ClrInstance clrInstance, NodeKind kind)
-        {
-            _context = context;
-            ClrInstance = clrInstance;
-
-            Id = clrInstance.ValueOrDefault?.ToString() ?? string.Empty;
-            Kind = kind;
-        }
-
-        public static CausalityNode Create(CausalityContext context, ClrInstance clrInstance, NodeKind kind)
-        {
-            return kind switch
-            {
-                NodeKind.Task => new TaskNode(context, clrInstance),
-                NodeKind.TaskCompletionSource => new TaskCompletionSourceNode(context, clrInstance),
-                NodeKind.AsyncStateMachine => new AsyncStateMachineNode(context, clrInstance),
-                NodeKind.AwaitTaskContinuation => new AwaitTaskContinuationNode(context, clrInstance),
-                NodeKind.Thread => new ThreadNode(context, clrInstance),
-                NodeKind.ManualResetEventSlim => new ManualResetEventSlimNode(context, clrInstance),
-                _ => new CausalityNode(context, clrInstance, kind),
-            };
         }
 
         public void Link()

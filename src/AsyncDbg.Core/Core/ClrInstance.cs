@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using AsyncDbg;
+using System.Text.RegularExpressions;
 using AsyncDbgCore.Core;
 using Microsoft.Diagnostics.Runtime;
 
@@ -41,7 +41,9 @@ namespace AsyncDbg.Core
             get
             {
                 var result = ValueOrDefault;
+
                 Contract.AssertNotNull(result);
+
                 return result;
             }
         }
@@ -211,7 +213,7 @@ namespace AsyncDbg.Core
             return null;
         }
 
-        public bool TryGetFieldValue(string fieldName, [NotNullWhenTrue]out ClrFieldValue? fieldValue)
+        public bool TryGetFieldValue(string fieldName, [NotNullWhen(true)]out ClrFieldValue? fieldValue)
         {
             fieldValue = TryGetFieldValue(fieldName);
             return fieldValue != null;
@@ -222,6 +224,8 @@ namespace AsyncDbg.Core
         {
             return ToString(registry: null);
         }
+
+        public static readonly Regex AddressRegex = new Regex(@"\(Addr:\d+\)");
 
         public string ToString(TypesRegistry? registry)
         {
@@ -239,7 +243,7 @@ namespace AsyncDbg.Core
             if (IsObject)
             {
                 string? typeName = registry != null ? Type?.TypeToString(registry) : Type?.Name;
-                return $"{typeName} ({ValueOrDefault})";
+                return $"{typeName} (Addr:{ValueOrDefault})";
             }
 
             if (ValueOrDefault == null)
@@ -270,6 +274,7 @@ namespace AsyncDbg.Core
             }
 
             Contract.AssertNotNull(Type, "Arrays should always have Type != null.");
+            Contract.AssertNotNull(ObjectAddress);
 
             var address = ObjectAddress.Value;
             var length = Type.GetArrayLength(address);

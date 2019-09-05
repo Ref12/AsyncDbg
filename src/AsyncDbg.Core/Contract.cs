@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Runtime.CompilerServices;
+using System.Diagnostics.CodeAnalysis;
 
 #nullable enable
 
@@ -7,7 +7,7 @@ namespace AsyncDbg
 {
     public static class Contract
     {
-        public static object AssertNotNull([EnsuresNotNull]object? o)
+        public static object AssertNotNull([NotNull]object? o)
         {
             if (o == null)
             {
@@ -17,7 +17,7 @@ namespace AsyncDbg
             return o;
         }
 
-        public static T AssertNotNull<T>([EnsuresNotNull]T? o) where T : struct
+        public static T AssertNotNull<T>([NotNull]T? o) where T : struct
         {
             if (o == null)
             {
@@ -35,7 +35,7 @@ namespace AsyncDbg
             }
         }
 
-        public static T AssertNotNull<T>([EnsuresNotNull]T? value, string message) where T : class
+        public static T AssertNotNull<T>([NotNull]T? value, string message) where T : class
         {
             if (value == null)
             {

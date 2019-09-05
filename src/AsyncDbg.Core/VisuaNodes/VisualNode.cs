@@ -18,10 +18,10 @@ namespace AsyncDbg.VisuaNodes
 
         public string Id { get; }
         public string DisplayText { get; }
-
         public HashSet<CausalityNode> CausalityNodes { get; }
+        public Lazy<Guid> Key { get; }
 
-        public VisualNode(string id, string displayText, params CausalityNode[] nodes)
+        public VisualNode(string id, string displayText, Lazy<Guid> key, params CausalityNode[] nodes)
         {
             Contract.Requires(nodes.Length != 0, "nodes.Length != 0");
 
@@ -29,6 +29,7 @@ namespace AsyncDbg.VisuaNodes
             DisplayText = displayText;
             _lastOrSingleCausalityNode = nodes.Last();
             CausalityNodes = new HashSet<CausalityNode>(nodes);
+            Key = key;
         }
 
         public static VisualNode Create(params CausalityNode[] nodes)
@@ -49,7 +50,7 @@ namespace AsyncDbg.VisuaNodes
                 displayText = nodes[0].ToString();
             }
 
-            return new VisualNode(id, displayText, nodes);
+            return new VisualNode(id, displayText, nodes[0].Key, nodes);
         }
 
         public void MaterializeDependencies(Dictionary<CausalityNode, VisualNode> visualMap)
@@ -73,7 +74,7 @@ namespace AsyncDbg.VisuaNodes
 
         public static VisualNode Create(CausalityNode causalityNode)
         {
-            return new VisualNode(causalityNode.Id, causalityNode.ToString(), causalityNode);
+            return new VisualNode(causalityNode.Id, causalityNode.ToString(), causalityNode.Key, causalityNode);
         }
 
         public IEnumerable<VisualNode> EnumerateAwaitsOnAndSelf()

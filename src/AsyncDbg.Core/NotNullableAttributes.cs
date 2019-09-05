@@ -1,4 +1,4 @@
-﻿namespace System.Runtime.CompilerServices
+﻿namespace System.Diagnostics.CodeAnalysis
 {
     [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false)]
     public class AssertsTrueAttribute : Attribute
@@ -25,5 +25,17 @@
     public class NotNullWhenTrueAttribute : Attribute
     {
         public NotNullWhenTrueAttribute() { }
+    }
+
+    [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false)]
+    public class NotNullWhenAttribute : Attribute
+    {
+        public NotNullWhenAttribute(bool predicate) { }
+    }
+
+    [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false)]
+    public class NotNullAttribute : Attribute
+    {
+        public NotNullAttribute() { }
     }
 }
