@@ -262,7 +262,7 @@ namespace AsyncDbg.Causality
                     }
                 }
 
-                var parent = taskNode.ClrInstance["m_parent"].Instance;
+                var parent = taskNode.ClrInstance.TryGetFieldValue("m_parent")?.Instance;
                 if (parent.IsNotNull())
                 {
                     AddDependent(parent);

@@ -201,10 +201,17 @@ namespace AsyncDbg.Core
 
         public ClrFieldValue? TryGetFieldValue(string fieldName)
         {
+            return TryGetFieldValueCore(fieldName, ignoreCase: false)
+                ?? (fieldName.StartsWith("m_") ? TryGetFieldValueCore("_" + fieldName.Substring(2), ignoreCase: true) : null);
+        }
+
+        public ClrFieldValue? TryGetFieldValueCore(string fieldName, bool ignoreCase)
+        {
             var propertyName = $"<{fieldName}>k__BackingField";
+            var comparer = ignoreCase ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
             foreach (var field in Fields)
             {
-                if (field.Field.Name == fieldName || field.Field.Name == propertyName)
+                if (comparer.Equals(field.Field.Name, fieldName) || comparer.Equals(field.Field.Name, propertyName))
                 {
                     return field;
                 }
