@@ -17,6 +17,16 @@ namespace AsyncDbgCore.Core
 {
     public static class ClrTypeExtensions
     {
+        public static bool IsClosure(this ClrType? type)
+        {
+            if (type == null)
+            {
+                return false;
+            }
+
+            return type.Name.Contains("DisplayClass") && type.Name.Contains("<>c__");
+        }
+
         public static bool IsIntrinsic(this ClrType type)
         {
             return (type.IsPrimitive || type.IsString);

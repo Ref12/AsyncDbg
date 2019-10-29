@@ -11,6 +11,9 @@
     <TargetFramework>net472</TargetFramework>
     <LangVersion>preview</LangVersion>
     <Prefer32Bit>false</Prefer32Bit>
+    <ApplicationIcon />
+    <OutputType>Exe</OutputType>
+    <StartupObject />
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">

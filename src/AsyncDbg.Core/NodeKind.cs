@@ -6,6 +6,7 @@
         Task,
         ValueTask,
         UnwrapPromise,
+        ContinuationTask,
         ManualResetEventSlim,
         AwaitTaskContinuation,
         ManualResetEvent,

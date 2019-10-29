@@ -50,7 +50,7 @@ namespace AsyncDbgCore.New
             //
             // Continuation for a simple await.
             //
-            if (_continuation.IsOfType(_typesRegistry.AwaitTaskContinuationIndex))
+            if (_continuation.IsOfType(_typesRegistry.AwaitTaskContinuationIndex) || _continuation.IsOfType(_typesRegistry.TaskIndex))
             {
                 yield return continuation["m_action"].Instance;
                 yield break;

@@ -8,6 +8,7 @@ using AsyncDbg.InstanceWrappers;
 using AsyncDbgCore.Core;
 using AsyncDbgCore.New;
 using Codex.Utilities;
+using static AsyncDbgCore.Core.ClrTypeExtensions;
 
 #nullable enable
 
@@ -88,13 +89,14 @@ namespace AsyncDbg.Causality
 
         public Guid ComputeKey()
         {
-            Murmur3 murmur = new Murmur3();
-            var bytes = Encoding.UTF8.GetBytes(ClrInstance.AddressRegex.Replace(ToString(), ""));
+            return Guid.NewGuid();
+            //Murmur3 murmur = new Murmur3();
+            //var bytes = Encoding.UTF8.GetBytes(ClrInstance.AddressRegex.Replace(ToString(), ""));
 
-            var dependencies = EnumerateDependenciesAndSelfDepthFirst();
-            var hash = dependencies.Select(t => Encoding.UTF8.GetBytes(ClrInstance.AddressRegex.Replace(t.ToString(), "")));
-            // Hash dependencies nodes and normalized display text for self
-            return murmur.ComputeHash(hash.Select(ba => new ArraySegment<byte>(ba))).AsGuid();
+            //var dependencies = EnumerateDependenciesAndSelfDepthFirst();
+            //var hash = dependencies.Select(t => Encoding.UTF8.GetBytes(ClrInstance.AddressRegex.Replace(t.ToString(), "")));
+            //// Hash dependencies nodes and normalized display text for self
+            //return murmur.ComputeHash(hash.Select(ba => new ArraySegment<byte>(ba))).AsGuid();
         }
 
         public IEnumerable<CausalityNode> EnumerateNeighborsAndSelfDepthFirst(Func<CausalityNode, IEnumerable<CausalityNode>> getNeighbors)
@@ -149,6 +151,10 @@ namespace AsyncDbg.Causality
 
         public void Link()
         {
+            if (ClrInstance.ObjectAddress == 2981077162744L)
+            {
+
+            }
             if (this is AwaitTaskContinuationNode)
             {
                 ProcessUnblockedInstance(ClrInstance);
@@ -196,6 +202,7 @@ namespace AsyncDbg.Causality
                             {
                                 if (_context.TryGetNodeFor(instance, out var dependentNode))
                                 {
+                                    //dependentNode.AddEdge(dependency: dependentNode, dependent);
                                     AddEdge(dependency: this, dependent: dependentNode);
                                 }
                             }
@@ -349,6 +356,31 @@ namespace AsyncDbg.Causality
                             continue;
                         }
 
+                        // If the action points to a closure, it is possible that the closure
+                        // is responsible for setting the result of a task completion source.
+                        // There is no simple way to detect whether this is the case or not, so we will add the "edge" unconditionally.
+                        if (actionTarget.Type.IsClosure())
+                        {
+                            foreach (var field in actionTarget.Fields)
+                            {
+                                if (_context.TaskCompletionSourceIndex.ContainsType(field.Instance.Type))
+                                //if (field.Instance.IsOfType(_context.TaskCompletionSourceIndex))
+                                {
+                                    if (_context.TryGetNodeFor(field.Instance, out var dependentNode2))
+                                    {
+                                        dependentNode2.AddEdge(dependency: dependentNode2, dependent: this);
+                                        //AddEdge(dependentNode2, this);
+                                    }
+
+                                    //dependentNode.AddEdge(dependency: dependentNode, dependent);
+                                    //AddDependency(field.Instance["m_task"].Instance);
+                                    //AddDependent(field.Instance);
+                                }
+                            }
+
+                            continue;
+                        }
+
                         // m_stateMachine field is defined in AsyncMethodBuilderCore and in MoveNextRunner.
                         var stateMachine = actionTarget.TryGetFieldValue("m_stateMachine")?.Instance;
                         if (stateMachine.IsNull())
@@ -357,10 +389,12 @@ namespace AsyncDbg.Causality
                         }
 
                         //TargetInstance = stateMachine;
-
-
                     }
-                    else if (continuation.IsOfType(_context.StandardTaskContinuationType) || _context.TaskCompletionSourceIndex.ContainsType(continuation.Type))
+                    else if (continuation.IsOfType(_context.StandardTaskContinuationType))
+                    {
+                        nextContinuation = continuation["m_task"].Instance;
+                    }
+                    else if (_context.TaskCompletionSourceIndex.ContainsType(continuation.Type))
                     {
                         nextContinuation = continuation["m_task"].Instance;
                     }
@@ -380,7 +414,7 @@ namespace AsyncDbg.Causality
                             ProcessUnblockedInstance(continuationItem);
                         }
                     }
-                    else if (_context.AwaitTaskContinuationIndex.ContainsType(continuation.Type))
+                    else if (_context.AwaitTaskContinuationIndex.ContainsType(continuation.Type) || continuation.IsOfType(_context.Registry.TaskIndex))
                     {
                         nextContinuation = continuation["m_action"].Instance;
                     }
