@@ -155,10 +155,6 @@ namespace AsyncDbg.Causality
 
         public void Link()
         {
-            if (ClrInstance.ObjectAddress == 2981077162744L)
-            {
-
-            }
             if (this is AwaitTaskContinuationNode)
             {
                 ProcessUnblockedInstance(ClrInstance);

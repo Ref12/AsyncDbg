@@ -13,7 +13,7 @@ using Microsoft.Diagnostics.Runtime;
 
 #nullable enable
 
-namespace AsyncDbgCore.Core
+namespace AsyncDbg.Core
 {
     public static class ClrTypeExtensions
     {

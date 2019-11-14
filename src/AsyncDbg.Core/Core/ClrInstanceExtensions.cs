@@ -8,11 +8,9 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
-using AsyncDbg;
 using AsyncDbg.Causality;
-using AsyncDbg.Core;
 
-namespace AsyncDbgCore.New
+namespace AsyncDbg.Core
 {
 #nullable enable
 

@@ -11,6 +11,16 @@ namespace AsyncDbg.Causality
         {
         }
 
+        // - TaskContinuation: abstract base that provides a virtual Run method
+        //     - StandardTaskContinuation: wraps a task,options,and scheduler, and overrides Run to process the task with that configuration
+        //     - AwaitTaskContinuation: base for continuations created through TaskAwaiter; targets default scheduler by default
+        //         - TaskSchedulerAwaitTaskContinuation: awaiting with a non-default TaskScheduler
+        //         - SynchronizationContextAwaitTaskContinuation: awaiting with a "current" sync ctx
+
+
+        public ClrInstance ContinuationObject => ClrInstance["m_action"].Instance;
+
+
         /// <summary>
         /// Returns true if the current instance is SynchronizationContextAwaitTaskContinuation instance.
         /// We can check this by looking into the field m_syncContext.
