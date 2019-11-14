@@ -1,14 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using AsyncDbg.Core;
 using AsyncDbg.InstanceWrappers;
-using AsyncDbgCore.Core;
-using AsyncDbgCore.New;
-using Codex.Utilities;
-using static AsyncDbgCore.Core.ClrTypeExtensions;
 
 #nullable enable
 
@@ -20,14 +15,23 @@ namespace AsyncDbg.Causality
         protected TypesRegistry Types => _context.Registry;
 
         /// <summary>
-        /// Object instance that backes current causality node.
+        /// A CLR object instance that backs the current causality node.
         /// </summary>
         public ClrInstance ClrInstance { get; }
 
         public CausalityNode? CompletionSourceTaskNode { get; private set; }
         public Lazy<Guid> Key { get; }
 
-        public bool IsRoot => Dependents.Count == 0;
+        public bool IsRoot
+        {
+            get
+            {
+                if (Dependents.Count == 0) return true;
+                //if (Dependents.Count == 0) return true;
+                return false;
+            }
+        }
+
         public bool IsLeaf => Dependencies.Count == 0;
 
         /// <summary>
@@ -171,6 +175,8 @@ namespace AsyncDbg.Causality
             }
             else if (this is ThreadNode threadNode)
             {
+                CausalityNode? lastMoveNext = null;
+
                 foreach (var stackObject in threadNode.EnumerateStackObjects())
                 {
                     var so = stackObject;
@@ -178,6 +184,17 @@ namespace AsyncDbg.Causality
                     // Handle the state machine from the stack.
                     if (_context.Registry.IsAsyncStateMachine(so.Type))
                     {
+                        if (_context.TryGetNodeAt(so.Object, out var dependent))
+                        {
+                            // This feels very hacky but we need to separate the case when this thread is related to a state machine and when it's not.
+                            if (threadNode.HasAsyncStateMachineMoveNextCall(so))
+                            {
+                                // This check makes sure that this thread indeed is trying to move the state machine forward.
+                                //AddEdge(dependency: this, dependent: dependent);
+                                lastMoveNext = dependent;
+                            }
+                        }
+
                         // Thread could have a state machine on the stack because it was responsible for running a task, but now it yielded the control away.
                         var clrInstance = ClrInstance.CreateInstance(_context.Heap, so.Object, so.Type);
                         var asyncStateMachineInstance = new AsyncStateMachineInstance(clrInstance, _context.Registry);
@@ -188,7 +205,8 @@ namespace AsyncDbg.Causality
                             if (threadNode.HasAsyncStateMachineMoveNextCall(so))
                             {
                                 // This check makes sure that this thread indeed is trying to move the state machine forward.
-                                AddEdge(dependency: this, dependent: dependentNode);
+                                //AddEdge(dependency: this, dependent: dependentNode);
+                                lastMoveNext = dependentNode;
                             }
                         }
                     }
@@ -232,6 +250,11 @@ namespace AsyncDbg.Causality
                                 break;
                         }
                     }
+                }
+
+                if (lastMoveNext != null)
+                {
+                    AddEdge(dependency: this, dependent: lastMoveNext);
                 }
             }
 
@@ -460,6 +483,12 @@ namespace AsyncDbg.Causality
                 {
                     return asyncMethodBuild;
                 }
+            }
+
+            // CoreCLR case
+            if (asyncBuilderInstance.TryGetFieldValue("m_continuationObject", out var continuation))
+            {
+                //return continuation.Instance;
             }
 
             return null;
