@@ -14,7 +14,6 @@ using Microsoft.Diagnostics.Runtime;
 
 namespace AsyncDbg
 {
-
     public class TypesRegistry
     {
         private ClrHeap _heap => _heapContext;
@@ -66,7 +65,7 @@ namespace AsyncDbg
 
             ThreadIndex = CreateTypeIndex(NodeKind.Thread);
             TaskCompletionSourceIndex = CreateTypeIndex(NodeKind.TaskCompletionSource);
-            SemaphoreSlimIndex = CreateTypeIndex(NodeKind.SemaphoreSlim, addToIndex: false);
+            SemaphoreSlimIndex = CreateTypeIndex(NodeKind.SemaphoreSlim);
             SemaphoreWrapperIndex = CreateTypeIndex(NodeKind.SemaphoreWrapper, addToIndex: false);
             IAsyncStateMachineTypeIndex = CreateTypeIndex(NodeKind.AsyncStateMachine);
 

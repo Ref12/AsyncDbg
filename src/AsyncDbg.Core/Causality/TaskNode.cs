@@ -5,8 +5,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using AsyncDbg.Core;
 using AsyncDbg.InstanceWrappers;
-using AsyncDbgCore.Core;
-using AsyncDbgCore.New;
 
 #nullable enable
 
@@ -14,20 +12,16 @@ namespace AsyncDbg.Causality
 {
     public class TaskNode : CausalityNode
     {
-        /// <summary>
-        /// Optional synchronization context attached to a current task node.
-        /// The field is not null if the task represents an async operation that runs within a sync context.
-        /// </summary>
-        private ClrInstance? _syncContext;
-
         [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
         private readonly TaskInstance _taskInstance;
 
         // Not null if the task originates from TaskCompletionSource<T>
-        private CausalityNode? _taskCompletionSource;
+        private TaskCompletionSourceNode? _taskCompletionSource;
+
+        private SemaphoreSlimNode? _semaphoreSlimNode;
 
         // Not null if the task originates from async state machine.
-        private CausalityNode? _asyncStateMachine;
+        private AsyncStateMachineNode? _asyncStateMachine;
 
         public TaskNode(CausalityContext context, ClrInstance task)
             : base(context, task, NodeKind.Task)
@@ -36,7 +30,7 @@ namespace AsyncDbg.Causality
         }
 
         /// <inheritdoc />
-        protected override string DisplayStatus => _taskInstance.Status.ToString();
+        protected override string DisplayStatus => $"Status={_taskInstance.Status}, Kind={TaskKind}";
 
         public TaskKind TaskKind
         {
@@ -50,6 +44,9 @@ namespace AsyncDbg.Causality
 
                 if (Types.IsTaskWhenAll(ClrInstance))
                     return TaskKind.WhenAll;
+
+                if (_semaphoreSlimNode != null)
+                    return TaskKind.SemaphoreSlimTaskNode;
 
                 if (Types.IsUnwrapPromise(ClrInstance))
                 {
@@ -76,51 +73,84 @@ namespace AsyncDbg.Causality
             }
         }
 
-        public ClrInstance ContinuationObject
-        {
-            get
-            {
-                var continuationObject = ClrInstance["m_continuationObject"].Instance;
-                if (continuationObject.IsNotNull())
-                {
-                    return continuationObject;
-                }
+        public ClrInstance ContinuationObject => GetContinuationObject();
 
-                return ClrInstance["m_action"].Instance;
+        private ClrInstance GetContinuationObject()
+        {
+            var continuationObject = ClrInstance["m_continuationObject"].Instance;
+            if (continuationObject.IsNotNull())
+            {
+                return continuationObject;
             }
+
+            return ClrInstance["m_action"].Instance;
         }
 
         ///// <inheritdoc />
         //public override bool Visible => TaskKind <= TaskKind.VisibleTaskKind;
 
         /// <inheritdoc />
-        public override bool IsComplete => _taskInstance.IsCompleted && !ProcessingContinuations;
+        public override bool IsComplete => _taskInstance.IsCompleted;
 
-        public void SetTaskCompletionSource(CausalityNode tcs)
+        public void SetTaskCompletionSource(TaskCompletionSourceNode tcs)
         {
             Contract.Assert(TaskKind == TaskKind.Unknown, $"Can not change task origin because it was already set to '{TaskKind}'");
 
             _taskCompletionSource = tcs;
         }
 
-        public void SetAsyncStateMachine(CausalityNode asyncStateMachine)
+        public void SetAsyncStateMachine(AsyncStateMachineNode asyncStateMachine)
         {
-            Contract.Assert(TaskKind == TaskKind.Unknown, $"Can not change task origin because it was already set to '{TaskKind}'");
+            Contract.Assert(TaskKind == TaskKind.Unknown || TaskKind == TaskKind.AsyncMethodTask, $"Can not change task origin because it was already set to '{TaskKind}'");
 
             _asyncStateMachine = asyncStateMachine;
         }
-
-        protected override void AddEdge(CausalityNode dependency, CausalityNode dependent)
+        public void SetSemaphoreSlim(SemaphoreSlimNode semaphoreSlimNode)
         {
-            if (dependency == this && dependent is AwaitTaskContinuationNode await && await.SyncContext != null)
+            Contract.Assert(TaskKind == TaskKind.Unknown, $"Can not change task origin because it was already set to '{TaskKind}'");
+            _semaphoreSlimNode = semaphoreSlimNode;
+        }
+
+        /// <inheritdoc />
+        public override void Link()
+        {
+            var taskNode = this;
+
+            if (taskNode.TaskKind == TaskKind.WhenAll)
             {
-                // Saving it and not adding as an edge to simplify visualization.
-                _syncContext = await.SyncContext;
+                foreach (var item in taskNode.WhenAllContinuations)
+                {
+                    AddDependency(item);
+                }
+            }
+
+            var parent = taskNode.ClrInstance.TryGetFieldValue("m_parent")?.Instance;
+            if (parent.IsNotNull())
+            {
+                // m_parent is not null for Parallel.ForEach, for instance.
+                AddDependent(parent);
+            }
+
+            // The continuation instance is a special (causality) node, then just adding the edge
+            // without extra processing.
+
+            if (Context.TryGetNodeFor(taskNode.ContinuationObject, out var dependentNode))
+            {
+                AddDependent(dependentNode);
             }
             else
             {
-                base.AddEdge(dependency, dependent);
+                var continuations = ContinuationResolver.TryResolveContinuations(taskNode.ContinuationObject, Context);
+                foreach (var c in continuations)
+                {
+                    if (Context.TryGetNodeFor(c, out dependentNode))
+                    {
+                        AddDependent(dependentNode);
+                    }
+                }
             }
+            //ProcessUnblockedInstance(taskNode.ContinuationObject);
+            
         }
 
         /// <inhertidoc />
@@ -129,16 +159,12 @@ namespace AsyncDbg.Causality
             var result = TaskKind switch
             {
                 TaskKind.FromTaskCompletionSource => Contract.AssertNotNull(_taskCompletionSource).ToString(),
-                TaskKind.AsyncMethodTask => Contract.AssertNotNull(_asyncStateMachine).ToString(),
-                TaskKind.WhenAll => $"{InsAndOuts()} {ClrInstance.ToString(Types)}",
+                //TaskKind.AsyncMethodTask => Contract.AssertNotNull(_asyncStateMachine).ToString(),
+                // var result = $"{InsAndOuts()} [{DisplayStatus.ToString()}] {ClrInstance?.ToString(Types) ?? ""}";
+                //TaskKind.WhenAll => $"{InsAndOuts()} [{DisplayStatus.ToString()}] {ClrInstance.ToString(Types)}",
                 TaskKind.TaskRun => $"{InsAndOuts()} Task.Run ({ClrInstance.ObjectAddress})",
                 _ => base.ToStringCore(),
             };
-
-            if (_syncContext != null)
-            {
-                result += $"{Environment.NewLine}(with sync context: {_syncContext.Type?.TypeToString(Types)})";
-            }
 
             return result;
         }
@@ -158,6 +184,7 @@ namespace AsyncDbg.Causality
         WhenAll,
         FromTaskCompletionSource,
         AsyncMethodTask,
+        SemaphoreSlimTaskNode,
         VisibleTaskKind = WhenAll
     }
 }

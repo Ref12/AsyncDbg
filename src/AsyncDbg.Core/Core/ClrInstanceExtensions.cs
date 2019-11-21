@@ -52,7 +52,7 @@ namespace AsyncDbg.Core
             return false;
         }
 
-        public static bool IsNotNull([NotNullWhenTrue]this ClrInstance? instance)
+        public static bool IsNotNull([NotNullWhen(true)]this ClrInstance? instance)
         {
             return instance != null && !instance.IsNull;
         }

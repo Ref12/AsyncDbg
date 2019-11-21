@@ -48,7 +48,21 @@ namespace AsyncDbg.Core
 
         public static bool IsOfType(this ClrType type, Type actualType)
         {
-            return type.Name == actualType.FullName;
+            if (type.Name == actualType.FullName)
+            {
+                // Full name match
+                return true;
+            }
+
+            if (actualType.IsGenericType)
+            {
+                // type.Name can be something like AsyncMethodBuilder<System.__Canon>. In this case
+                // just replace the first generic argument by `1.
+                // Need to support generics with any number of arguments.
+                return type.Name.Replace("<System.__Canon>", "`1") == actualType.FullName;
+            }
+
+            return false;
         }
 
         public static bool IsOfTypes(this ClrType type, params Type[] actualTypes)

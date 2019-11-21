@@ -3,10 +3,10 @@ using System.Linq;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 using System.Threading;
-using AsyncDbgCore.Core;
 using Microsoft.Diagnostics.Runtime;
 using static System.Environment;
 using System.Runtime.CompilerServices;
+using AsyncDbg.Core;
 
 #nullable enable
 
@@ -47,9 +47,9 @@ namespace AsyncDbg.Causality
         {
             // It is easier to reason about the reversed stack.
             var reversedStack = clrStack.Reverse().ToList();
-            var index = 0;
 
             var reservedEnhancedStack = new List<EnhancedStackFrame>(clrStack.Count);
+            int index;
             for (index = 0; index < reversedStack.Count;)
             {
                 // It is easier to reason about the stack in bottom to top order.
@@ -69,7 +69,7 @@ namespace AsyncDbg.Causality
             return string.Join(NewLine, StackFrames);
         }
 
-        private static bool TryCreateEnhancedStackFrame(IList<ClrStackFrame> stackTrace, TypesRegistry types, ref int frameIdx, [NotNullWhenTrue]out EnhancedStackFrame? enhancedStackFrame)
+        private static bool TryCreateEnhancedStackFrame(IList<ClrStackFrame> stackTrace, TypesRegistry types, ref int frameIdx, [NotNullWhen(true)]out EnhancedStackFrame? enhancedStackFrame)
         {
             enhancedStackFrame = null;
             try
@@ -116,7 +116,7 @@ namespace AsyncDbg.Causality
             return enhancedStackFrame != null;
         }
 
-        private static bool TryGetMethodName(ClrStackFrame stackFrame, [NotNullWhenTrue]out string? methodName)
+        private static bool TryGetMethodName(ClrStackFrame stackFrame, [NotNullWhen(true)]out string? methodName)
         {
             methodName = stackFrame.Method.Name;
             return methodName != null;
@@ -172,7 +172,7 @@ namespace AsyncDbg.Causality
             return true;
         }
 
-        private static bool IsGetAwaiterGetResult(IList<ClrStackFrame> stackTrace, ref int frameIdx, [NotNullWhenTrue]out EnhancedStackFrame? result)
+        private static bool IsGetAwaiterGetResult(IList<ClrStackFrame> stackTrace, ref int frameIdx, [NotNullWhen(true)]out EnhancedStackFrame? result)
         {
             result = null;
             var frame = stackTrace[frameIdx];

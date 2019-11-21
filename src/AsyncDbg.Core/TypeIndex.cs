@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using AsyncDbg.Core;
 using Microsoft.Diagnostics.Runtime;
@@ -8,6 +9,7 @@ namespace AsyncDbg
 {
     public class TypeIndex
     {
+        private readonly Dictionary<ulong, ClrInstance> _instancesByAddress = new Dictionary<ulong, ClrInstance>();
         private readonly HashSet<ClrInstance> _instances = new HashSet<ClrInstance>(ClrInstanceAddressComparer.Instance);
         private readonly HashSet<ClrType> _derivedTypesAndRoot = new HashSet<ClrType>(ClrTypeEqualityComparer.Instance);
 
@@ -42,7 +44,11 @@ namespace AsyncDbg
             return false;
         }
 
-        public void AddInstance(ClrInstance instance) => _instances.Add(instance);
+        public void AddInstance(ClrInstance instance)
+        {
+            _instances.Add(instance);
+            _instancesByAddress[instance.ObjectAddress.Value] = instance;
+        }
 
         public IEnumerable<ClrType> GetTypesByFullName(string fullName)
         {
@@ -52,6 +58,11 @@ namespace AsyncDbg
         public bool ContainsType(ClrType? type)
         {
             return type != null && _derivedTypesAndRoot.Contains(type);
+        }
+
+        public bool TryGetInstanceAt(ulong address, out ClrInstance result)
+        {
+            return _instancesByAddress.TryGetValue(address, out result);
         }
     }
 }

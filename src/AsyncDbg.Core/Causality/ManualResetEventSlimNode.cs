@@ -25,5 +25,10 @@ namespace AsyncDbg.Causality
                 _onInvokeMresInstanceUsedByTaskAwaiter = true;
             }
         }
+
+        protected override void AddEdge(CausalityNode? dependency, CausalityNode? dependent)
+        {
+            base.AddEdge(dependency, dependent);
+        }
     }
 }

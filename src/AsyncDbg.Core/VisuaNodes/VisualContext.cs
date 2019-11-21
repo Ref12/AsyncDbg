@@ -112,7 +112,7 @@ namespace AsyncDbg.VisuaNodes
                 }
 
                 var visual = VisualNode.Create(collapseable.ToArray());
-
+                visualNodes.Add(visual);
                 // associate all collapsed nodes with visualNode
                 map.TryAddRange(collapseable, visual);
                 collapseable.Clear();
@@ -120,8 +120,9 @@ namespace AsyncDbg.VisuaNodes
 
             bool isCollapseable(CausalityNode? previousNode, CausalityNode node)
             {
-                var isCollapsable = node.Dependencies.Count <= 1 && node.Kind != NodeKind.Thread;
-                return isCollapsable;
+                return false;
+                //var isCollapsable = node.Dependencies.Count <= 1 && node.Kind != NodeKind.Thread;
+                //return isCollapsable;
             }
 
             bool shouldCollapse(CausalityNode? previousNode, CausalityNode node)
@@ -138,7 +139,13 @@ namespace AsyncDbg.VisuaNodes
 
             var visualContext = new VisualContext();
 
-            var asyncGraphs = roots.Select(root => visualContext.Add(root)).ToArray();
+            List<AsyncGraph> asyncGraphs = new List<AsyncGraph>();
+
+            foreach(var root in roots)
+            {
+                var graph = visualContext.Add(root);
+                asyncGraphs.Add(graph);
+            }
 
             foreach(var grph in asyncGraphs)
             {

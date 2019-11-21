@@ -18,8 +18,7 @@ namespace AsyncDbg.Causality
         //         - SynchronizationContextAwaitTaskContinuation: awaiting with a "current" sync ctx
 
 
-        public ClrInstance ContinuationObject => ClrInstance["m_action"].Instance;
-
+        public ClrInstance? ContinuationObject => ContinuationResolver.TryResolveContinuationForAction(ClrInstance["m_action"].Instance, Context);
 
         /// <summary>
         /// Returns true if the current instance is SynchronizationContextAwaitTaskContinuation instance.
@@ -31,5 +30,21 @@ namespace AsyncDbg.Causality
         /// Returns <see cref="System.Threading.SynchronizationContext"/> instance if awailable.
         /// </summary>
         public ClrInstance? SyncContext => ClrInstance.TryGetFieldValue("m_syncContext")?.Instance;
+
+        /// <inheritdoc />
+        public override void Link()
+        {
+            var continuation = ContinuationObject;
+
+            // Await task continuation usually points to a state machine.
+            if (SyncContext != null && TryGetNodeFor(continuation) is AsyncStateMachineNode asyncStateMachine)
+            {
+                asyncStateMachine.SetSyncContext(SyncContext);
+            }
+            else if (continuation != null)
+            {
+                AddDependency(continuation);
+            }
+        }
     }
 }

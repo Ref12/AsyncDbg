@@ -31,6 +31,8 @@ namespace AsyncDbg.Causality
 
         public HeapContext Heap { get; }
 
+        public ClrRuntime Runtime => Heap.DefaultHeap.Runtime;
+
         public CausalityContext(HeapContext heapContext)
         {
             Registry = TypesRegistry.Create(heapContext);
@@ -75,7 +77,7 @@ namespace AsyncDbg.Causality
             return false;
         }
 
-        public bool TryGetThreadById(int threadId, out ClrThread thread) => _threadsById.TryGetValue(threadId, out thread);
+        public bool TryGetThreadById(int threadId, [NotNullWhen(true)]out ClrThread? thread) => _threadsById.TryGetValue(threadId, out thread);
 
         public CausalityNode GetNode(ClrInstance instance)
         {

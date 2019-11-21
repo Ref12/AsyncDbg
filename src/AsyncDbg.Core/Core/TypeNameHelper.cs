@@ -1,4 +1,7 @@
 ﻿using Microsoft.Diagnostics.Runtime;
+using System.Text.RegularExpressions;
+
+#nullable enable
 
 namespace AsyncDbg.Core
 {
@@ -14,7 +17,7 @@ namespace AsyncDbg.Core
 
             if (_registry.IsAsyncStateMachine(type))
             {
-                return GetAsyncMethodNameFromAsyncStateMachine(type, typeName);
+                return GetAsyncMethodNameFromAsyncStateMachine(typeName);
             }
 
             if (_registry.IsTask(type))
@@ -22,8 +25,7 @@ namespace AsyncDbg.Core
                 return
                     typeName
                     .Replace("<VoidTaskResult>", "")
-                    .Replace("+WhenAllPromise", ".WhenAll()")
-                    ;
+                    .Replace("+WhenAllPromise", ".WhenAll()");
             }
 
             return type.ToString();
@@ -39,19 +41,76 @@ namespace AsyncDbg.Core
             return typeName;
         }
 
-        private string GetAsyncMethodNameFromAsyncStateMachine(ClrType type, string typeName)
+        /// <summary>
+        /// Makes a name of an async state machine type more readable.
+        /// </summary>
+        public static string GetAsyncMethodNameFromAsyncStateMachine(string originalTypeName)
         {
-            // The type name format is NamespaceName.TypeName+<MethodName>d__x
-            var plusIndex = typeName.IndexOf("+");
-            Contract.Assert(plusIndex != -1, $"{typeName} should have '+' sign in it.");
+            // Possible cases:
+            // 1. Async state machine for an instance/static method:
+            // like: ManualResetEventSlimOnTheStack.Program+<RunAsync>d__1
+            //
+            // 2. Async state machine for an async lambda expression:
+            // like:
+            // ManualResetEventSlimOnTheStack.Program+<>c+<<RunAsync>b__1_0>d -> lambda1
+            // ManualResetEventSlimOnTheStack.Program+<>c+<<RunAsync>b__1_1>d -> lambda2
+            // 
+            // 3. Async state machine for a local async method:
+            // like: ManualResetEventSlimOnTheStack.Program+<<RunAsync>g__local|1_2>d
 
-            var greaterIndex = typeName.IndexOf(">", plusIndex);
-            Contract.Assert(greaterIndex != -1, $"{typeName} should have '>' sign in it.");
+            var regex = new Regex(@"(?<typeName>[^+]+)\+.*?<(?<method>\w+)>(?<suffix>.+)");
+            var match = regex.Match(originalTypeName);
+            if (match.Success)
+            {
+                var typeName = match.Groups["typeName"].Value;
+                var method = match.Groups["method"].Value;
+                var suffix = match.Groups["suffix"].Value;
 
-            var methodName = typeName.Substring(plusIndex + 2, greaterIndex - plusIndex - 2);
-            var resultingTypeName = typeName.Substring(0, plusIndex);
+                string? localName = suffix switch
+                {
+                    // simple async method: d__1
+                    _ when suffix.Contains("d__") => null,
 
-            return $"{resultingTypeName}.{methodName}";
+                    // lambda: b__1_0>d
+                    _ when suffix.Contains("b__") => "lambda" + ExtractFrom(suffix, "b__1_", ">"),
+
+                    // g__local|1_2>d
+                    _ when suffix.Contains("g__") => ExtractFrom(suffix, "g__", "|"),
+                    _ => suffix,
+                };
+
+                var result = $"{typeName}.{method}";
+                if (localName != null)
+                {
+                    result += "." + localName;
+                }
+
+                return result;
+            }
+
+            System.Console.WriteLine($"Can't match the state machine's name '{originalTypeName}'.");
+            return originalTypeName;
+        }
+
+        private static string ExtractFrom(string text, string prefix, string suffix)
+        {
+            var prefixEndIdx = text.IndexOf(prefix);
+            if (prefixEndIdx == -1)
+            {
+                return text;
+            }
+
+            // IndexOf returns a starting index, need to move to the end of the prefix
+            prefixEndIdx += prefix.Length;
+
+            var startSuffixIdx = text.IndexOf(suffix, prefixEndIdx);
+            if (startSuffixIdx == -1)
+            {
+                return text.Substring(prefixEndIdx);
+            }
+
+            int length = startSuffixIdx - prefixEndIdx;
+            return text.Substring(prefixEndIdx, length);
         }
     }
 }
