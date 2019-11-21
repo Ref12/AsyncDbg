@@ -242,18 +242,6 @@ namespace AsyncDbg.Causality
             return _tcsSetResultFrames.Contains(stackFrame?.StackPointer ?? ulong.MaxValue);
         }
 
-        /// <summary>
-        /// Returns true if <see cref="IAsyncStateMachine.MoveNext"/> method call is somewhere on the thread's stack.
-        /// </summary>
-        public bool HasAsyncStateMachineMoveNextCall(ClrRoot stackObject)
-        {
-            ClrStackFrame? stackFrame = GetStackFrame(stackObject);
-
-            // This method is way less precise than InsideTrySetResultMethodCall, because
-            // the tread can be actually down the stack and do something else already.
-            return _stateMachineMoveNextFrames.Count != 0;
-        }
-
         private ClrStackFrame? GetStackFrame(ClrRoot stackObject)
         {
             // TODO: I'm not sure I need it!
