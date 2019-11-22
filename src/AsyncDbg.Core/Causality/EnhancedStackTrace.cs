@@ -4,9 +4,10 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using Microsoft.Diagnostics.Runtime;
-using static System.Environment;
 using System.Runtime.CompilerServices;
 using AsyncDbg.Core;
+
+using static System.Environment;
 
 #nullable enable
 
@@ -69,7 +70,11 @@ namespace AsyncDbg.Causality
             return string.Join(NewLine, StackFrames);
         }
 
-        private static bool TryCreateEnhancedStackFrame(IList<ClrStackFrame> stackTrace, TypesRegistry types, ref int frameIdx, [NotNullWhen(true)]out EnhancedStackFrame? enhancedStackFrame)
+        private static bool TryCreateEnhancedStackFrame(
+            IList<ClrStackFrame> stackTrace,
+            TypesRegistry types,
+            ref int frameIdx,
+            [NotNullWhen(true)]out EnhancedStackFrame? enhancedStackFrame)
         {
             enhancedStackFrame = null;
             try
@@ -105,7 +110,9 @@ namespace AsyncDbg.Causality
                 }
                 else
                 {
-                    enhancedStackFrame = new EnhancedStackFrame(EnhancedStackFrameKind.RegularStackFrame, currentFrame);
+                    string displayString = TypeNameHelper.TrySimplifyMethodSignature(currentFrame.DisplayString);
+
+                    enhancedStackFrame = new EnhancedStackFrame(EnhancedStackFrameKind.RegularStackFrame, displayString, currentFrame);
                 }
             }
             finally

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using AsyncDbg.Core;
 using Microsoft.Diagnostics.Runtime;
 
@@ -19,18 +21,14 @@ namespace AsyncDbg.Causality
         private readonly ClrThread? _clrThread;
 
         private readonly EnhancedStackTrace? _enhancedStackTrace;
-        private readonly HashSet<ulong> _tcsSetResultFrames = new HashSet<ulong>();
 
         /// <summary>
-        /// Instances of async state machines currently running MoveNext method.
+        /// A list of all causaility node instances found running on the stack.
+        /// For instance, ReaderWriteLockSlim.Wait(), Task.Wait(), AsyncStatMachine.MoveNext etc.
         /// </summary>
-        private readonly List<ClrInstance> _asyncStateMachinesInMoveNext = new List<ClrInstance>();
+        private readonly HashSet<(CausalityNode node, string method)> _causailityNodesOnTheStack = new HashSet<(CausalityNode node, string method)>();
 
-        private readonly List<ulong> _stackTraceAddresses = new List<ulong>();
-
-        public IList<ClrStackFrame> StackTrace => _clrThread?.StackTrace ?? new List<ClrStackFrame>();
-
-        public int StackTraceLength => _clrThread?.StackTrace.Count ?? 0;
+        private int StackTraceLength => _clrThread?.StackTrace.Count ?? 0;
 
         /// <nodoc />
         public ThreadNode(CausalityContext context, ClrInstance thread)
@@ -41,114 +39,44 @@ namespace AsyncDbg.Causality
 
             if (_clrThread != null)
             {
-
                 _enhancedStackTrace = EnhancedStackTrace.Create(_clrThread.StackTrace, context.Registry);
+                PopulateCausalityNodesOnStack(_clrThread);
+            }
+        }
 
-                foreach (var stackFrame in _clrThread.StackTrace)
+        private void PopulateCausalityNodesOnStack(ClrThread clrThread)
+        {
+            foreach (var stackFrame in clrThread.StackTrace)
+            {
+                ClrType? type = stackFrame.Method?.Type;
+                string? methodName = stackFrame.Method?.Name;
+                if (type == null && methodName == null)
                 {
-                    _stackTraceAddresses.Add(stackFrame.StackPointer);
+                    continue;
+                }
 
-                    if (context.Registry.IsTaskCompletionSource(stackFrame.Method?.Type) &&
-                        stackFrame.Method?.Name == "TrySetResult")
-                    {
-                        _tcsSetResultFrames.Add(stackFrame.StackPointer);
-                    }
-
-                    if (context.Registry.IsAsyncStateMachine(stackFrame.Method?.Type) &&
-                        stackFrame.Method?.Name == "MoveNext")
-                    {
-                        var stateMachine = FindAsyncStateMachine(_clrThread.StackLimit, stackFrame.StackPointer);
-                        if (stateMachine != null)
-                        {
-                            _asyncStateMachinesInMoveNext.Add(stateMachine);
-                        }
-                    }
+                CausalityNode? causalityNode = FindCausalityNode(clrThread.StackLimit, stackFrame.StackPointer);
+                if (causalityNode != null && methodName != null)
+                {
+                    _causailityNodesOnTheStack.Add((node: causalityNode, method: methodName));
                 }
             }
         }
 
-        private ClrInstance? FindAsyncStateMachine(ulong start, ulong stop)
+        private CausalityNode? FindCausalityNode(ulong start, ulong stop)
         {
             foreach (ulong ptr in EnumeratePointersInRange(start, stop))
             {
-                if (_runtime.ReadPointer(ptr, out ulong val))
+                if (_runtime.ReadPointer(ptr, out ulong address))
                 {
-                    if (Context.Registry.IAsyncStateMachineTypeIndex.TryGetInstanceAt(val, out ClrInstance clrInstance))
+                    if (Context.TryGetNodeAt(address, out var result))
                     {
-                        // Check the type?
-                        return clrInstance;
+                        return result;
                     }
                 }
             }
 
             return null;
-        }
-
-        // The next two methods are copied from clrmd codebase.
-        private IEnumerable<ulong> EnumerateObjectsOfTypes(ulong start, ulong stop, HashSet<string> types)
-        {
-            ClrHeap heap = _runtime.Heap;
-            foreach (ulong ptr in EnumeratePointersInRange(start, stop))
-            {
-                if (_runtime.ReadPointer(ptr, out ulong obj))
-                {
-                    if (heap.IsInHeap(obj))
-                    {
-                        ClrType type = heap.GetObjectType(obj);
-
-                        int sanity = 0;
-                        while (type != null)
-                        {
-                            if (types.Contains(type.Name))
-                            {
-                                yield return obj;
-
-                                break;
-                            }
-
-                            type = type.BaseType;
-
-                            if (sanity++ == 16)
-                            {
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        private IEnumerable<ulong> EnumerateObjectsOfType(ulong start, ulong stop, Func<ClrType, bool> typeMatchPredicate)
-        {
-            ClrHeap heap = _runtime.Heap;
-            foreach (ulong ptr in EnumeratePointersInRange(start, stop))
-            {
-                if (_runtime.ReadPointer(ptr, out ulong obj))
-                {
-                    if (heap.IsInHeap(obj))
-                    {
-                        ClrType type = heap.GetObjectType(obj);
-
-                        int sanity = 0;
-                        while (type != null)
-                        {
-                            if (typeMatchPredicate(type))
-                            {
-                                yield return obj;
-
-                                break;
-                            }
-
-                            type = type.BaseType;
-
-                            if (sanity++ == 16)
-                            {
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
         }
 
         private IEnumerable<ulong> EnumeratePointersInRange(ulong start, ulong stop)
@@ -171,11 +99,6 @@ namespace AsyncDbg.Causality
             }
         }
 
-        public IEnumerable<ClrRoot> EnumerateStackObjects()
-        {
-            return _clrThread?.EnumerateStackObjects() ?? Enumerable.Empty<ClrRoot>();
-        }
-
         /// <inheritdoc />
         public override bool IsComplete => Dependencies.All(d => d.IsComplete) && StackTraceLength == 0;
 
@@ -195,7 +118,7 @@ namespace AsyncDbg.Causality
         protected override string DisplayStatus => $"{base.DisplayStatus} (Id={_clrThread?.ManagedThreadId})";
 
         /// <inheritdoc />
-        protected override void AddEdge(CausalityNode? dependency, CausalityNode? dependent)
+        protected override bool AddEdge(CausalityNode? dependency, CausalityNode? dependent)
         {
             if (dependent == this && dependency is ManualResetEventSlimNode mre && BlockedOnTaskAwaiter())
             {
@@ -205,7 +128,7 @@ namespace AsyncDbg.Causality
                 mre.UsedByTaskAwaiter();
             }
 
-            base.AddEdge(dependency, dependent);
+            return base.AddEdge(dependency, dependent);
         }
 
         /// <inheritdoc />
@@ -213,14 +136,33 @@ namespace AsyncDbg.Causality
         {
             base.Link();
 
-            foreach (var moveNextRunner in _asyncStateMachinesInMoveNext)
+            foreach ((CausalityNode node, string method) in _causailityNodesOnTheStack)
             {
-                if (TryGetNodeFor(moveNextRunner) is AsyncStateMachineNode stateMachine)
+                switch (node, method)
                 {
-                    stateMachine.RunningMoveNext(this);
-                    AddEdge(dependency: this, dependent: stateMachine);
+                    case (AsyncStateMachineNode sm, "MoveNext"):
+                        sm.RunningMoveNext(this);
+                        AddEdge(this, sm);
+                        break;
+                    case (TaskCompletionSourceNode tcs, string m) when m.StartsWith("Set") || m.StartsWith("TrySet"):
+                        AddEdge(this, tcs);
+                        break;
+                    case ({ Kind: NodeKind.ManualResetEventSlim }, "Wait"):
+                    case ({ Kind: NodeKind.ManualResetEvent }, "WaitOne"):
+                        AddEdge(dependency: node, dependent: this);
+                        break;
+                    case (TaskNode task, string m) when task.Status == TaskStatus.Running:
+                        AddEdge(dependency: this, dependent: node);
+                        break;
+                    default:
+                        // This is actually pretty common case.
+                        // For instance, if a thread is blocked on a task, then we'll see it here with method == "Wait",
+                        // but in our case the thread will be blocked on the underlying ManualResetEventSlim.
+                        // Console.WriteLine($"Unknown causailty node's status on the stack. ThreadId={_clrThread?.ManagedThreadId}, Method={method}, Node={node}");
+                        break;
+
                 }
-            }
+            };
         }
 
         private static ClrThread? TryGetClrThread(CausalityContext context, ClrInstance instance)
@@ -233,37 +175,6 @@ namespace AsyncDbg.Causality
             return clrThread;
         }
         
-        /// <summary>
-        /// Returns true if the thread is blocked inside <see cref="TaskCompletionSource{TResult}.TrySetResult(TResult)"/>
-        /// </summary>
-        public bool InsideTrySetResultMethodCall(ClrRoot stackInstance)
-        {
-            var stackFrame = GetStackFrame(stackInstance);
-            return _tcsSetResultFrames.Contains(stackFrame?.StackPointer ?? ulong.MaxValue);
-        }
-
-        private ClrStackFrame? GetStackFrame(ClrRoot stackObject)
-        {
-            // TODO: I'm not sure I need it!
-            if (stackObject.StackFrame != null)
-            {
-                return stackObject.StackFrame;
-            }
-
-            var result = _stackTraceAddresses.BinarySearch(stackObject.Address);
-            if (result < 0)
-            {
-                result = ~result;
-            }
-
-            if (result < StackTrace.Count)
-            {
-                return StackTrace[result];
-            }
-
-            return null;
-        }
-
         /// <summary>
         /// Returns true if the current thread instance is blocked on ManualResetEventSlim because of TaskAwaiter.GetResult.
         /// </summary>

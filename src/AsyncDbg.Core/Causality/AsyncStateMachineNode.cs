@@ -150,7 +150,7 @@ namespace AsyncDbg.Causality
         }
 
         /// <inheritdoc />
-        protected override void AddEdge(CausalityNode? dependency, CausalityNode? dependent)
+        protected override bool AddEdge(CausalityNode? dependency, CausalityNode? dependent)
         {
             if (dependent is TaskNode taskNode && dependency == this)
             {
@@ -160,7 +160,7 @@ namespace AsyncDbg.Causality
             }
             //else
             {
-                base.AddEdge(dependency, dependent);
+                return base.AddEdge(dependency, dependent);
             }
         }
 

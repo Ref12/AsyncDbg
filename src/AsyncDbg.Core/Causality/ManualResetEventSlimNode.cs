@@ -26,9 +26,9 @@ namespace AsyncDbg.Causality
             }
         }
 
-        protected override void AddEdge(CausalityNode? dependency, CausalityNode? dependent)
+        protected override bool AddEdge(CausalityNode? dependency, CausalityNode? dependent)
         {
-            base.AddEdge(dependency, dependent);
+            return base.AddEdge(dependency, dependent);
         }
     }
 }

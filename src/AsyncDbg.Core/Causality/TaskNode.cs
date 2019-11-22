@@ -29,6 +29,9 @@ namespace AsyncDbg.Causality
             _taskInstance = new TaskInstance(task);
         }
 
+        /// <nodoc />
+        public TaskStatus Status => _taskInstance.Status;
+
         /// <inheritdoc />
         protected override string DisplayStatus => $"Status={_taskInstance.Status}, Kind={TaskKind}";
 
@@ -58,6 +61,11 @@ namespace AsyncDbg.Causality
                     // Unwrap() sets this to false, Run() sets it to true.
                     // private readonly bool _lookForOce;
                     return (bool)ClrInstance["_lookForOce"].Instance.Value ? TaskKind.TaskRun : TaskKind.UnwrapPromise;
+                }
+
+                if (Status == TaskStatus.Running)
+                {
+                    return TaskKind.TaskRun;
                 }
 
                 return TaskKind.Unknown;
@@ -105,6 +113,7 @@ namespace AsyncDbg.Causality
 
             _asyncStateMachine = asyncStateMachine;
         }
+
         public void SetSemaphoreSlim(SemaphoreSlimNode semaphoreSlimNode)
         {
             Contract.Assert(TaskKind == TaskKind.Unknown, $"Can not change task origin because it was already set to '{TaskKind}'");
@@ -149,7 +158,6 @@ namespace AsyncDbg.Causality
                     }
                 }
             }
-            //ProcessUnblockedInstance(taskNode.ContinuationObject);
             
         }
 

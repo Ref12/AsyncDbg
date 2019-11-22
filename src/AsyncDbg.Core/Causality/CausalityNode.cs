@@ -171,60 +171,6 @@ namespace AsyncDbg.Causality
 
         public virtual void Link()
         {
-            if (this is ThreadNode threadNode)
-            {
-                CausalityNode? lastMoveNext = null;
-
-                foreach (var stackObject in threadNode.EnumerateStackObjects())
-                {
-                    var so = stackObject;
-
-                    if (Context.Registry.IsTask(so.Type))
-                    {
-                        if (threadNode.StackTrace.Count != 0)
-                        {
-                            var instance = ClrInstance.CreateInstance(Context.Heap, so.Object, so.Type);
-                            var taskInstance = new TaskInstance(instance);
-                            if (taskInstance.Status == TaskStatus.Running)
-                            {
-                                if (Context.TryGetNodeFor(instance, out var dependentNode))
-                                {
-                                    AddEdge(dependency: this, dependent: dependentNode);
-                                }
-                            }
-                        }
-                    }
-
-                    if (Context.TryGetNodeAt(stackObject.Object, out var node))
-                    {
-                        switch (node.Kind)
-                        {
-                            case NodeKind.ManualResetEventSlim:
-                            case NodeKind.ManualResetEvent:
-                                AddEdge(dependency: node, dependent: this);
-                                break;
-                            case NodeKind.TaskCompletionSource:
-                                AddEdge(dependency: this, dependent: node);
-                                break;
-                            case NodeKind.Thread:
-                            //case NodeKind.AsyncStateMachine:
-                            default:
-                                break;
-                        }
-                    }
-                }
-
-                //if (asyncStateMachineOnTheStack != null)
-                //{
-                //    asyncStateMachineOnTheStack.RunningMoveNext(threadNode);
-                //}
-
-                if (lastMoveNext != null)
-                {
-                    //AddEdge(dependency: this, dependent: lastMoveNext);
-                }
-            }
-
             if (this is AsyncStateMachineNode asyncStateMachine && asyncStateMachine.StateMachineState >= 0)
             {
                 // Need to process continuations only when the state machine awaits using task awaiter.
@@ -482,22 +428,23 @@ namespace AsyncDbg.Causality
             AddEdge(dependency: this, dependent: dependent);
         }
 
-        protected virtual void AddEdge(CausalityNode? dependency, CausalityNode? dependent)
+        protected virtual bool AddEdge(CausalityNode? dependency, CausalityNode? dependent)
         {
             if (dependency == null || dependency.ClrInstance?.IsNull == true || dependent == null || dependency.ClrInstance?.IsNull == true)
             {
                 // Can't add edge to nothing
-                return;
+                return false;
             }
 
             if (dependency == dependent)
             {
                 // Avoiding self-references.
-                return;
+                return false;
             }
 
             dependency.Dependents.Add(dependent);
             dependent.Dependencies.Add(dependency);
+            return true;
         }
 
         /// <inheritdoc />
