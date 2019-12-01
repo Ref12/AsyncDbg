@@ -39,7 +39,7 @@ namespace AsyncDbg.Causality
 
         private readonly StateMachineStatus _status;
 
-        // Resulting task is null for async void methods.
+        // Resulting task instance is null for async void methods (i.e. _resultingTask != null, but _resultingTask.IsNull() == true).
         private readonly ClrInstance _resultingTask;
 
         /// <nodoc />
@@ -59,7 +59,7 @@ namespace AsyncDbg.Causality
                 Contract.AssertNotNull(_awaitedTask, $"For state machine state '{StateMachineState}' an awaited task should be available");
             }
 
-            _resultingTask = GetResultingTask(clrInstance);
+            _resultingTask = GetResultingTask(clrInstance, Context.Registry);
         }
 
         public void SetSyncContext(ClrInstance syncContext)
@@ -82,6 +82,11 @@ namespace AsyncDbg.Causality
 
         public ThreadNode? MoveNextRunnerThread => _moveNextRunnerThread;
 
+        /// <summary>
+        /// Returns a task that the current state machines awaits on.
+        /// </summary>
+        public ClrInstance? AwaitedTask => _awaitedTask;
+
         public TaskNode? AwaitedTaskNode => (TaskNode?)TryGetNodeFor(AwaitedTask);
 
         public ClrInstance ResultingTask => _resultingTask;
@@ -89,7 +94,7 @@ namespace AsyncDbg.Causality
         // The result actually can be null, when not all the nodes are registered.
         // For instance, accessing this property from constructor may return null.
         // Maybe assert that Context.Linked is true or something similar?
-        public TaskNode ResultingTaskNode => (TaskNode)TryGetNodeFor(ResultingTask)!;
+        public TaskNode ResultingTaskNode => (TaskNode)TryGetNodeFor(_resultingTask)!;
 
         public StateMachineStatus Status =>
             StateMachineState switch
@@ -103,10 +108,13 @@ namespace AsyncDbg.Causality
 
         public int StateMachineState => (int)ClrInstance["<>1__state"].Instance?.Value!;
 
-        public ClrInstance? AwaitedTask => _awaitedTask;
-
-        public static ClrInstance GetResultingTask(ClrInstance stateMachine)
+        /// <summary>
+        /// Gets a resulting task for a given state machine instance.
+        /// </summary>
+        public static ClrInstance GetResultingTask(ClrInstance stateMachine, TypesRegistry registry)
         {
+            Contract.Requires(registry.IsAsyncStateMachine(stateMachine.Type), $"A given instance should be a compiler generated state machine. Actual type: '{stateMachine.Type!.Name}'.");
+
             if (stateMachine.TryGetFieldValue("<>t__builder", out var asyncMethodBuilderField))
             {
                 var asyncMethodBuild = asyncMethodBuilderField.Instance;
@@ -121,6 +129,17 @@ namespace AsyncDbg.Causality
                 {
                     return asyncMethodBuilderTaskField.Instance;
                 }
+
+                 if (registry.IsTask(asyncMethodBuild.Type))
+                {
+                    return asyncMethodBuild;
+                }
+            }
+
+            // CoreCLR case
+            if (stateMachine.TryGetFieldValue("m_continuationObject", out var continuation))
+            {
+                return continuation.Instance;
             }
 
             Contract.Assert(false, "Can't find a resulting task for the instance.");
@@ -150,31 +169,21 @@ namespace AsyncDbg.Causality
         }
 
         /// <inheritdoc />
-        protected override bool AddEdge(CausalityNode? dependency, CausalityNode? dependent)
-        {
-            if (dependent is TaskNode taskNode && dependency == this)
-            {
-                //Contract.Assert(_underlyingTask == null, "AddEdge method should be called only once");
-                //_underlyingTask = taskNode;
-                //taskNode.SetAsyncStateMachine(this);
-            }
-            //else
-            {
-                return base.AddEdge(dependency, dependent);
-            }
-        }
-
-        /// <inheritdoc />
         public override void Link()
         {
-            base.Link();
+            if (StateMachineState >= 0)
+            {
+                // Need to process continuations only when the state machine awaits another task..
+                if (_awaitedTask != null)
+                {
+                    AddDependency(_awaitedTask);
+                }
+            }
 
-            //Contract.AssertNotNull(ResultingTaskNode, "Resulted task node should not be null here");
             // ResultingTaskNode is null for async void methods.
-            ResultingTaskNode?.SetAsyncStateMachine(this);
-
             if (ResultingTaskNode != null)
             {
+                ResultingTaskNode.SetAsyncStateMachine(this);
                 base.AddEdge(this, ResultingTaskNode);
             }
         }

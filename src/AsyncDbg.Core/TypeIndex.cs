@@ -47,7 +47,11 @@ namespace AsyncDbg
         public void AddInstance(ClrInstance instance)
         {
             _instances.Add(instance);
-            _instancesByAddress[instance.ObjectAddress.Value] = instance;
+
+            if (instance.ObjectAddress != null)
+            {
+                _instancesByAddress[instance.ObjectAddress.Value] = instance;
+            }
         }
 
         public IEnumerable<ClrType> GetTypesByFullName(string fullName)

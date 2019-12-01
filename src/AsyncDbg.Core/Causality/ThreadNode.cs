@@ -1,7 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using AsyncDbg.Core;
 using Microsoft.Diagnostics.Runtime;
@@ -118,20 +116,6 @@ namespace AsyncDbg.Causality
         protected override string DisplayStatus => $"{base.DisplayStatus} (Id={_clrThread?.ManagedThreadId})";
 
         /// <inheritdoc />
-        protected override bool AddEdge(CausalityNode? dependency, CausalityNode? dependent)
-        {
-            if (dependent == this && dependency is ManualResetEventSlimNode mre && BlockedOnTaskAwaiter())
-            {
-                // If the thread is blocked on task awaiter then we can simplify the graph
-                // buy excluding ManualResetEvent node from it.
-                // But to do so, ManualResetEventNode should be aware that it was used in this context.
-                mre.UsedByTaskAwaiter();
-            }
-
-            return base.AddEdge(dependency, dependent);
-        }
-
-        /// <inheritdoc />
         public override void Link()
         {
             base.Link();
@@ -173,14 +157,6 @@ namespace AsyncDbg.Causality
             // Not all the threads are presented in the context. If it's not there, the method returns null.
             context.TryGetThreadById(threadId, out var clrThread);
             return clrThread;
-        }
-        
-        /// <summary>
-        /// Returns true if the current thread instance is blocked on ManualResetEventSlim because of TaskAwaiter.GetResult.
-        /// </summary>
-        private bool BlockedOnTaskAwaiter()
-        {
-            return _enhancedStackTrace?.StackFrames.FirstOrDefault()?.Kind == EnhancedStackFrameKind.GetAwaiterGetResult;
         }
     }
 }

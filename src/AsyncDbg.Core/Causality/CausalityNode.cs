@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using AsyncDbg.Core;
-using AsyncDbg.InstanceWrappers;
 
 #nullable enable
 
@@ -12,21 +10,6 @@ namespace AsyncDbg.Causality
     public class CausalityNode
     {
         protected readonly CausalityContext Context;
-
-        protected CausalityNode? TryGetNodeFor(ClrInstance? instance)
-        {
-            if (instance == null)
-            {
-                return null;
-            }
-
-            if (Context.TryGetNodeFor(instance, out var result))
-            {
-                return result;
-            }
-
-            return null;
-        }
 
         protected TypesRegistry Types => Context.Registry;
 
@@ -43,11 +26,12 @@ namespace AsyncDbg.Causality
         {
             get
             {
-                if (Dependents.Count == 0) return true;
+                if (Dependents.Count == 0) { return true; }
 
-                if (this is ThreadNode) return true;
+                if (this is ThreadNode) { return true; }
 
-                if (this is AsyncStateMachineNode stateMachine && stateMachine.Dependents.Count != 0) return true;
+                if (this is AsyncStateMachineNode stateMachine && stateMachine.Dependents.Count != 0) { return true; }
+
                 //if (Dependents.Count == 0) return true;
                 return false;
             }
@@ -90,8 +74,25 @@ namespace AsyncDbg.Causality
                 NodeKind.Thread => new ThreadNode(context, clrInstance),
                 NodeKind.ManualResetEventSlim => new ManualResetEventSlimNode(context, clrInstance),
                 NodeKind.SemaphoreSlim => new SemaphoreSlimNode(context, clrInstance),
-                _ => new CausalityNode(context, clrInstance, kind),
+                _ => Return(() => new CausalityNode(context, clrInstance, kind)),
             };
+        }
+
+        private static T Return<T>(Func<T> provider) => provider();
+
+        protected CausalityNode? TryGetNodeFor(ClrInstance? instance)
+        {
+            if (instance == null)
+            {
+                return null;
+            }
+
+            if (Context.TryGetNodeFor(instance, out var result))
+            {
+                return result;
+            }
+
+            return null;
         }
 
         public string CreateDisplayText()
@@ -171,246 +172,7 @@ namespace AsyncDbg.Causality
 
         public virtual void Link()
         {
-            if (this is AsyncStateMachineNode asyncStateMachine && asyncStateMachine.StateMachineState >= 0)
-            {
-                // Need to process continuations only when the state machine awaits using task awaiter.
 
-                // TODO: should we look for semaphores for other cases as well?
-                FindSemaphores(ClrInstance);
-
-                var awaitedTask = asyncStateMachine.AwaitedTask;
-                if (awaitedTask != null)
-                {
-                    AddDependency(awaitedTask);
-                }
-
-                ProcessUnblockedInstance(ClrInstance);
-            }
-            else if (Kind == NodeKind.TaskCompletionSource)
-            {
-                ProcessUnblockedInstance(ClrInstance);
-            }
-        }
-
-        private bool TryAddEdge(ClrInstance? continuation, bool asDependent = true)
-        {
-            if (continuation != null && Context.TryGetNodeFor(continuation, out var dependentNode))
-            {
-                AddEdge(dependency: this, dependent: dependentNode);
-                return true;
-            }
-
-            return false;
-        }
-
-        protected void ProcessUnblockedInstance(ClrInstance? nextContinuation)
-        {
-            var isCurrentNode = nextContinuation == ClrInstance;
-            var nextIsCurrentNode = isCurrentNode;
-            while (nextContinuation != null)
-            {
-                var continuation = nextContinuation;
-                isCurrentNode = nextIsCurrentNode;
-                nextIsCurrentNode = false;
-
-                nextContinuation = null;
-
-                if (!continuation.IsNull)
-                {
-                    if (!isCurrentNode && Context.TryGetNodeFor(continuation, out var dependentNode))
-                    {
-                        AddEdge(dependency: this, dependent: dependentNode);
-                    }
-                    else if (Kind == NodeKind.AsyncStateMachine)
-                    {
-                        if (!isCurrentNode)
-                        {
-                            // Only link to the task created by the async state machine. After that, no further continuations to process
-                            return;
-                        }
-
-                        nextContinuation = AsyncStateMachineNode.GetResultingTask(continuation);
-
-                        //var stateMachine = continuation;
-
-                        //if (stateMachine.TryGetFieldValue("<>t__builder", out var asyncMethodBuilderField))
-                        //{
-                        //    var asyncMethodBuild = asyncMethodBuilderField.Instance;
-                        //    // Looking for a builder instance for async state machine generated for async Task and async ValueTask methods.
-                        //    if (asyncMethodBuild.TryGetFieldValue("m_builder", out var innerAsyncMethodBuilderField) ||
-                        //        asyncMethodBuild.TryGetFieldValue("_methodBuilder", out innerAsyncMethodBuilderField))
-                        //    {
-                        //        asyncMethodBuild = innerAsyncMethodBuilderField.Instance;
-                        //    }
-
-                        //    if (asyncMethodBuild.TryGetFieldValue("m_task", out var asyncMethodBuilderTaskField))
-                        //    {
-                        //        nextContinuation = asyncMethodBuilderTaskField.Instance;
-                        //    }
-                        //    //else if (asyncMethodBuild.Type.IsOfType(typeof(Task)))
-                        //    else if (_context.Registry.IsTask(asyncMethodBuild.Type))
-                        //    {
-                        //        nextContinuation = asyncMethodBuild;
-                        //    }
-                        //    else
-                        //    {
-                        //    }
-
-                        // This is an await continuation and the next continuation may be already finished.
-                        // In this case we mark the current instance as completed as well.
-                        //if (Context.)
-                        //}
-                    }
-                    else if (continuation.IsOfType(typeof(Action), Context))
-                    {
-                        var actionTarget = continuation["_target"].Instance;
-                        if (actionTarget.IsOfType(Context.ContinuationWrapperType))
-                        {
-                            // Do we need to look at the m_innerTask field as well here?
-                            nextContinuation = actionTarget["m_continuation"].Instance;
-                            continue;
-                        }
-
-                        // If the action points to a closure, it is possible that the closure
-                        // is responsible for setting the result of a task completion source.
-                        // There is no simple way to detect whether this is the case or not, so we will add the "edge" unconditionally.
-                        if (actionTarget.Type.IsClosure())
-                        {
-                            foreach (var field in actionTarget.Fields)
-                            {
-                                if (Context.TaskCompletionSourceIndex.ContainsType(field.Instance.Type))
-                                //if (field.Instance.IsOfType(_context.TaskCompletionSourceIndex))
-                                {
-                                    if (Context.TryGetNodeFor(field.Instance, out var dependentNode2))
-                                    {
-                                        dependentNode2.AddEdge(dependency: dependentNode2, dependent: this);
-                                        //AddEdge(dependentNode2, this);
-                                    }
-
-                                    //dependentNode.AddEdge(dependency: dependentNode, dependent);
-                                    //AddDependency(field.Instance["m_task"].Instance);
-                                    //AddDependent(field.Instance);
-                                }
-                            }
-
-                            continue;
-                        }
-
-                        // m_stateMachine field is defined in AsyncMethodBuilderCore and in MoveNextRunner.
-                        var stateMachine = actionTarget.TryGetFieldValue("m_stateMachine")?.Instance;
-                        if (stateMachine.IsNull())
-                        {
-                            continue;
-                        }
-
-                        if (Context.TryGetNodeFor(stateMachine, out var stateMachineNode))
-                        {
-                            AddEdge(dependency: this, dependent: stateMachineNode);
-
-                            //TargetInstance = stateMachine;
-                        }
-                    }
-                    else if (continuation.IsOfType(Context.StandardTaskContinuationType))
-                    {
-                        nextContinuation = continuation["m_task"].Instance;
-                    }
-                    else if (Context.TaskCompletionSourceIndex.ContainsType(continuation.Type))
-                    {
-                        nextContinuation = continuation["m_task"].Instance;
-                    }
-                    else if (continuation.IsCompletedTaskContinuation(Context))
-                    {
-                        // Continuation is a special sentinel instance that indicates that the task is completed.
-                        break;
-                    }
-                    // Need to compare by name since GetTypeByName does not work for the generic type during initialization
-                    else if (continuation.Type?.Name == "System.Collections.Generic.List<System.Object>")
-                    {
-                        var size = (int)continuation["_size"].Instance.ValueOrDefault;
-                        var items = continuation["_items"].Instance.Items;
-                        for (var i = 0; i < size; i++)
-                        {
-                            var continuationItem = items[i];
-                            ProcessUnblockedInstance(continuationItem);
-                        }
-                    }
-                    else if (Context.AwaitTaskContinuationIndex.ContainsType(continuation.Type) || continuation.IsOfType(Context.Registry.TaskIndex))
-                    {
-                        nextContinuation = continuation["m_action"].Instance;
-                    }
-                    else
-                    {
-                        //continuation.ComputeInfo();
-                    }
-                }
-            }
-        }
-
-        public class AsyncStateMachineInstance
-        {
-            private readonly ClrInstance _instance;
-            public AsyncStateMachineInstance(ClrInstance instance, TypesRegistry registry)
-            {
-                _instance = instance;
-
-                Continuation = TryGetAsyncBuildersContinuation(instance, registry);
-            }
-
-            public ClrInstance? Continuation { get; }
-        }
-
-        private static ClrInstance? TryGetAsyncBuildersContinuation(ClrInstance asyncBuilderInstance, TypesRegistry registry)
-        {
-            if (asyncBuilderInstance.TryGetFieldValue("<>t__builder", out var asyncMethodBuilderField))
-            {
-                var asyncMethodBuild = asyncMethodBuilderField.Instance;
-                // Looking for a builder instance for async state machine generated for async Task and async ValueTask methods.
-                if (asyncMethodBuild.TryGetFieldValue("m_builder", out var innerAsyncMethodBuilderField) ||
-                    asyncMethodBuild.TryGetFieldValue("_methodBuilder", out innerAsyncMethodBuilderField))
-                {
-                    asyncMethodBuild = innerAsyncMethodBuilderField.Instance;
-                }
-
-                if (asyncMethodBuild.TryGetFieldValue("m_task", out var asyncMethodBuilderTaskField))
-                {
-                    return asyncMethodBuilderTaskField.Instance;
-                }
-                //else if (asyncMethodBuild.Type.IsOfType(typeof(Task)))
-                else if (registry.IsTask(asyncMethodBuild.Type))
-                {
-                    return asyncMethodBuild;
-                }
-            }
-
-            // CoreCLR case
-            if (asyncBuilderInstance.TryGetFieldValue("m_continuationObject", out var continuation))
-            {
-                return continuation.Instance;
-            }
-
-            return null;
-        }
-
-        private void FindSemaphores(ClrInstance targetInstance)
-        {
-            var registry = Context.Registry;
-
-            foreach (var field in targetInstance.Fields)
-            {
-                if (field == null)
-                {
-                    continue;
-                }
-
-                if (registry.IsSemaphoreWrapper(field.Field.Type))
-                {
-                    var semaphore = field.Instance["_semaphore"].Instance;
-                    if (semaphore.IsNotNull())
-                    {
-                        AddDependent(semaphore);
-                    }
-                }
-            }
         }
 
         protected void AddDependency(ClrInstance dependency)
@@ -428,9 +190,9 @@ namespace AsyncDbg.Causality
             AddEdge(dependency: this, dependent: dependent);
         }
 
-        protected virtual bool AddEdge(CausalityNode? dependency, CausalityNode? dependent)
+        protected virtual bool AddEdge(CausalityNode dependency, CausalityNode dependent)
         {
-            if (dependency == null || dependency.ClrInstance?.IsNull == true || dependent == null || dependency.ClrInstance?.IsNull == true)
+            if (dependency.ClrInstance?.IsNull == true || dependency.ClrInstance?.IsNull == true)
             {
                 // Can't add edge to nothing
                 return false;

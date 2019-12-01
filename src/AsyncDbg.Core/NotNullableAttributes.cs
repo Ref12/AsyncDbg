@@ -15,17 +15,6 @@
     {
         public EnsuresNotNullAttribute() { }
     }
-    [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false)]
-    public class NotNullWhenFalseAttribute : Attribute
-    {
-        public NotNullWhenFalseAttribute() { }
-    }
-
-    [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false)]
-    public class NotNullWhenTrueAttribute : Attribute
-    {
-        public NotNullWhenTrueAttribute() { }
-    }
 
     [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false)]
     public class NotNullWhenAttribute : Attribute

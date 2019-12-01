@@ -12,7 +12,6 @@
         ManualResetEvent,
         AsyncStateMachine,
         SemaphoreSlim,
-        SemaphoreWrapper,
         Thread,
 
         // Blocking objects must be processed after threads

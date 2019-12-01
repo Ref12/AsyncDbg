@@ -339,25 +339,19 @@ namespace AsyncDbg.Core
             }
 
             var offsets = new HashSet<int>();
-            var fields = new List<ClrFieldValue>();
+            var fields = new List<ClrFieldValue?>();
 
             Contract.AssertNotNull(Type);
             foreach (var typeField in Type.EnumerateBaseTypesAndSelf().SelectMany(t => t.Fields))
             {
-                if (typeField.Name == "<>u__1")
-                {
-                    // TODO: what this is all about?
-                    // TODO: Maybe not an issue anymore?
-                    //continue;
-                }
-
                 if (offsets.Add(typeField.Offset))
                 {
-                    fields.Add(ClrFieldValue.Create(typeField, this, _interior));
+                    var instance = ClrFieldValue.Create(typeField, this, _interior);
+                    fields.Add(instance);
                 }
             }
 
-            return fields.Where(f => f != null).ToArray();
+            return fields.Where(f => f != null).ToArray()!;
         }
     }
 }

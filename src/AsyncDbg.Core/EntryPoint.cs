@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Linq;
-using AsyncDbg.Core;
 using Microsoft.Diagnostics.Runtime;
 
-namespace AsyncDbgCore.New
+namespace AsyncDbg.Core
 {
     public class EntryPoint
     {

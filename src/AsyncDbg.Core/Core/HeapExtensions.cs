@@ -5,12 +5,11 @@
 // --------------------------------------------------------------------
 
 using System.Collections.Generic;
-using AsyncDbg.Core;
 using Microsoft.Diagnostics.Runtime;
 
 #nullable enable
 
-namespace AsyncDbgCore.New
+namespace AsyncDbg.Core
 {
     public static class HeapExtensions
     {

@@ -13,12 +13,13 @@ namespace AsyncDbg.Causality
         // And the ResolveContinuations should return CausalityNode[]s
         public static ClrInstance[] TryResolveContinuations(ClrInstance continuation, CausalityContext context)
         {
-            if (continuation.Type?.Name == "System.Collections.Generic.List<System.Object>")
+            if (continuation.IsListOfObjects())
             {
                 var result = new List<ClrInstance>();
-                var size = (int)continuation["_size"].Instance.ValueOrDefault!;
+                int size = (int)continuation["_size"].Instance.ValueOrDefault!;
                 var items = continuation["_items"].Instance.Items;
-                for (var i = 0; i < size; i++)
+
+                for (int i = 0; i < size; i++)
                 {
                     var continuationItem = TryResolveContinuationInstance(items[i], context);
                     if (continuationItem != null)
@@ -41,12 +42,12 @@ namespace AsyncDbg.Causality
 
         public static ClrInstance? TryResolveContinuationInstance(ClrInstance continuation, CausalityContext context)
         {
-            if (continuation.IsOfType(context.StandardTaskContinuationType))
+            if (continuation.IsOfType(context.Registry.StandardTaskContinuationType))
             {
                 return continuation["m_task"].Instance;
             }
 
-            if (context.TaskCompletionSourceIndex.ContainsType(continuation.Type))
+            if (continuation.IsTaskCompletionSource(context))
             {
                 return continuation["m_task"].Instance;
             }
@@ -62,13 +63,13 @@ namespace AsyncDbg.Causality
                 return TryResolveContinuationForAction(continuation, context);
             }
 
-            if (context.AwaitTaskContinuationIndex.ContainsType(continuation.Type) || continuation.IsOfType(context.Registry.TaskIndex))
+            if (continuation.IsOfType(context.Registry.AwaitTaskContinuationIndex) || continuation.IsOfType(context.Registry.TaskIndex))
             {
                 return TryResolveContinuationForAction(continuation["m_action"].Instance, context);
             }
 
             // Need to compare by name since GetTypeByName does not work for the generic type during initialization
-            if (continuation.Type?.Name == "System.Collections.Generic.List<System.Object>")
+            if (continuation.IsListOfObjects())
             {
                 Contract.Assert(false, "Please call 'TryResolveContinuations' for a list of continuations.");
             }
@@ -82,7 +83,7 @@ namespace AsyncDbg.Causality
 
             var continuation = instance;
             var actionTarget = continuation["_target"].Instance;
-            if (actionTarget.IsOfType(context.ContinuationWrapperType))
+            if (actionTarget.IsOfType(context.Registry.ContinuationWrapperType))
             {
                 // Do we need to look at the m_innerTask field as well here?
                 return actionTarget["m_continuation"].Instance;
@@ -95,7 +96,7 @@ namespace AsyncDbg.Causality
             {
                 foreach (var field in actionTarget.Fields)
                 {
-                    if (context.TaskCompletionSourceIndex.ContainsType(field.Instance.Type))
+                    if (field.Instance.IsTaskCompletionSource(context))
                     {
                         return field.Instance;
                     }

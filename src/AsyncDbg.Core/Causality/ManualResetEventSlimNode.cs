@@ -6,29 +6,14 @@ namespace AsyncDbg.Causality
 {
     public class ManualResetEventSlimNode : CausalityNode
     {
-        private bool _onInvokeMresInstanceUsedByTaskAwaiter;
-
         /// <nodoc />
-        public ManualResetEventSlimNode(CausalityContext context, ClrInstance task)
-            : base(context, task, NodeKind.ManualResetEventSlim)
+        public ManualResetEventSlimNode(CausalityContext context, ClrInstance clrInstance)
+            : base(context, clrInstance, NodeKind.ManualResetEventSlim)
         {
             
         }
 
         /// <inheritdoc />
-        public override bool Visible => !_onInvokeMresInstanceUsedByTaskAwaiter;
-
-        public void UsedByTaskAwaiter()
-        {
-            if (ClrInstance.Type?.Name.Contains("SetOnInvokeMres") == true)
-            {
-                _onInvokeMresInstanceUsedByTaskAwaiter = true;
-            }
-        }
-
-        protected override bool AddEdge(CausalityNode? dependency, CausalityNode? dependent)
-        {
-            return base.AddEdge(dependency, dependent);
-        }
+        public override bool Visible => true;
     }
 }

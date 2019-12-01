@@ -16,7 +16,7 @@ namespace AsyncDbg.Tests
         {
             var status1 = 33554944;
 
-            //Console.WriteLine(TaskInstasnceHelpers.GetStatus(status1));
+            Console.WriteLine(TaskInstanceHelpers.GetStatus(status1));
             Console.WriteLine(TaskInstanceHelpers.GetStatus(33555456));
 
             /*

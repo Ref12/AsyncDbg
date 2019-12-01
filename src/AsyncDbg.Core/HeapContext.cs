@@ -1,11 +1,7 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using AsyncDbgCore.New;
 using Microsoft.Diagnostics.Runtime;
 
-namespace AsyncCausalityDebuggerNew
+namespace AsyncDbg.Core
 {
     public class HeapContext
     {

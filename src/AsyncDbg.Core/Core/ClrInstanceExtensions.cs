@@ -57,7 +57,7 @@ namespace AsyncDbg.Core
             return instance != null && !instance.IsNull;
         }
 
-        public static bool IsNull([NotNullWhenFalse]this ClrInstance? instance) => !IsNotNull(instance);
+        public static bool IsNull([NotNullWhen(false)]this ClrInstance? instance) => !IsNotNull(instance);
 
         public static bool IsTaskWhenAll(this ClrInstance instance, CausalityContext context)
         {
@@ -76,9 +76,9 @@ namespace AsyncDbg.Core
             return context.Registry.IsTaskCompletionSentinel(continuation);
         }
 
-        public static bool IsCompletedTaskContinuation(this ClrInstance continuation, TypesRegistry registry)
+        public static bool IsTaskCompletionSource(this ClrInstance continuation, CausalityContext context)
         {
-            return registry.IsTaskCompletionSentinel(continuation);
+            return context.Registry.IsTaskCompletionSource(continuation.Type);
         }
 
         public static bool IsListOfObjects(this ClrInstance instance)

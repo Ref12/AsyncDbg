@@ -6,8 +6,8 @@ namespace AsyncDbg.Causality
 {
     public class AwaitTaskContinuationNode : CausalityNode
     {
-        public AwaitTaskContinuationNode(CausalityContext context, ClrInstance task)
-            : base(context, task, NodeKind.AwaitTaskContinuation)
+        public AwaitTaskContinuationNode(CausalityContext context, ClrInstance clrInstance)
+            : base(context, clrInstance, NodeKind.AwaitTaskContinuation)
         {
         }
 

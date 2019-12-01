@@ -8,13 +8,11 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
-using AsyncCausalityDebuggerNew;
 
-namespace AsyncCausalityDebugger
+namespace AsyncDbg.Core
 {
     public sealed class DgmlWriter
     {
@@ -162,9 +160,9 @@ namespace AsyncCausalityDebugger
 
             XmlRootAttribute root = new XmlRootAttribute("DirectedGraph");
             root.Namespace = "http://schemas.microsoft.com/vs/2009/dgml";
-            
+
             XmlSerializer serializer = new XmlSerializer(typeof(Graph), root);
-            
+
             XmlWriterSettings settings = new XmlWriterSettings();
             settings.Indent = true;
             settings.Encoding = new UTF8Encoding(false);

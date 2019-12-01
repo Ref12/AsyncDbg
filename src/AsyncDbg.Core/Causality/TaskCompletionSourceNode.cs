@@ -6,53 +6,42 @@ namespace AsyncDbg.Causality
 {
     public class TaskCompletionSourceNode : CausalityNode
     {
-        private TaskNode? _underlyingTask;
-
         /// <nodoc />
-        public TaskCompletionSourceNode(CausalityContext context, ClrInstance task)
-            : base(context, task, NodeKind.TaskCompletionSource)
+        public TaskCompletionSourceNode(CausalityContext context, ClrInstance clrInstance)
+            : base(context, clrInstance, NodeKind.TaskCompletionSource)
         {
             
         }
 
         /// <inheritdoc />
-        public override bool IsComplete
-        {
-            get
-            {
-                Contract.AssertNotNull(_underlyingTask, "Underlying task should be initialized first.");
-                return _underlyingTask.IsComplete;
-            }
-        }
+        public override bool IsComplete => UnderlyingTaskNode.IsComplete;
 
         public override bool Visible => false;
 
         /// <inheritdoc />
-        protected override bool AddEdge(CausalityNode dependency, CausalityNode dependent)
+        protected override string ToStringCore()
         {
-            Contract.Assert(dependent.Kind == NodeKind.Task, "Only tasks can directly depend on TaskCompletionSource instances");
-            Contract.Assert(dependency.Kind == NodeKind.TaskCompletionSource, "dependency must be TaskCompletionSource");
-            Contract.Assert(dependency == this, "dependency == this");
-            Contract.Assert(_underlyingTask == null, "AddEdge method should be called only once");
+            // For task completion source we should use current dependnetis, but the dependents from the underlying task instance.
+            var insAndOuts = InsAndOuts(Dependencies.Count, Dependents.Count);
 
-            var taskNode = (TaskNode)dependent;
-            _underlyingTask = taskNode;
+            return $"{insAndOuts} {ClrInstance.Type}.Task ({ClrInstance.ObjectAddress})";
+        }
 
-            //ProcessingContinuations = taskNode.ProcessingContinuations;
-            taskNode.SetTaskCompletionSource(this);
-
-            return base.AddEdge(dependency, dependent);
+        public TaskNode UnderlyingTaskNode
+        {
+            get
+            {
+                TaskNode? result = (TaskNode?)TryGetNodeFor(ClrInstance["m_task"].Instance);
+                Contract.AssertNotNull(result);
+                return result;
+            }
         }
 
         /// <inheritdoc />
-        protected override string ToStringCore()
+        public override void Link()
         {
-            Contract.AssertNotNull(_underlyingTask, "AddEdge method should be called to set _underlyingTask to an actual instance.");
-
-            // For task completion source we should use current dependnetis, but the dependents from the underlying task instance.
-            var insAndOuts = InsAndOuts(Dependencies.Count, _underlyingTask.Dependents.Count);
-
-            return $"{insAndOuts} {ClrInstance.Type}.Task ({ClrInstance.ObjectAddress})";
+            UnderlyingTaskNode.SetTaskCompletionSource(this);
+            AddEdge(dependency: this, dependent: UnderlyingTaskNode);
         }
     }
 }

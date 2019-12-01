@@ -18,15 +18,16 @@ namespace AsyncDbg.Causality
         // Not null if the task originates from TaskCompletionSource<T>
         private TaskCompletionSourceNode? _taskCompletionSource;
 
+        // Not null if the task originates from SemaphoreSlim
         private SemaphoreSlimNode? _semaphoreSlimNode;
 
-        // Not null if the task originates from async state machine.
+        // Not null if the task originates from an async state machine.
         private AsyncStateMachineNode? _asyncStateMachine;
 
-        public TaskNode(CausalityContext context, ClrInstance task)
-            : base(context, task, NodeKind.Task)
+        public TaskNode(CausalityContext context, ClrInstance clrInstance)
+            : base(context, clrInstance, NodeKind.Task)
         {
-            _taskInstance = new TaskInstance(task);
+            _taskInstance = new TaskInstance(clrInstance);
         }
 
         /// <nodoc />
@@ -39,17 +40,13 @@ namespace AsyncDbg.Causality
         {
             get
             {
-                if (_taskCompletionSource != null)
-                    return TaskKind.FromTaskCompletionSource;
+                if (_taskCompletionSource != null) { return TaskKind.FromTaskCompletionSource; }
 
-                if (_asyncStateMachine != null)
-                    return TaskKind.AsyncMethodTask;
+                if (_asyncStateMachine != null) { return TaskKind.AsyncMethodTask; }
 
-                if (Types.IsTaskWhenAll(ClrInstance))
-                    return TaskKind.WhenAll;
+                if (Types.IsTaskWhenAll(ClrInstance)) { return TaskKind.WhenAll; }
 
-                if (_semaphoreSlimNode != null)
-                    return TaskKind.SemaphoreSlimTaskNode;
+                if (_semaphoreSlimNode != null) { return TaskKind.SemaphoreSlimTaskNode; }
 
                 if (Types.IsUnwrapPromise(ClrInstance))
                 {
@@ -66,6 +63,11 @@ namespace AsyncDbg.Causality
                 if (Status == TaskStatus.Running)
                 {
                     return TaskKind.TaskRun;
+                }
+
+                if (ClrInstance.Type?.Name.Contains("ContinuationTaskFromTask") == true)
+                {
+                    return TaskKind.ContinuationTaskFromTask;
                 }
 
                 return TaskKind.Unknown;
@@ -123,17 +125,15 @@ namespace AsyncDbg.Causality
         /// <inheritdoc />
         public override void Link()
         {
-            var taskNode = this;
-
-            if (taskNode.TaskKind == TaskKind.WhenAll)
+            if (TaskKind == TaskKind.WhenAll)
             {
-                foreach (var item in taskNode.WhenAllContinuations)
+                foreach (var item in WhenAllContinuations)
                 {
                     AddDependency(item);
                 }
             }
 
-            var parent = taskNode.ClrInstance.TryGetFieldValue("m_parent")?.Instance;
+            var parent = ClrInstance.TryGetFieldValue("m_parent")?.Instance;
             if (parent.IsNotNull())
             {
                 // m_parent is not null for Parallel.ForEach, for instance.
@@ -142,23 +142,28 @@ namespace AsyncDbg.Causality
 
             // The continuation instance is a special (causality) node, then just adding the edge
             // without extra processing.
-
-            if (Context.TryGetNodeFor(taskNode.ContinuationObject, out var dependentNode))
+            if (Context.TryGetNodeFor(ContinuationObject, out var dependentNode))
             {
                 AddDependent(dependentNode);
             }
             else
             {
-                var continuations = ContinuationResolver.TryResolveContinuations(taskNode.ContinuationObject, Context);
+                var continuations = ContinuationResolver.TryResolveContinuations(ContinuationObject, Context);
                 foreach (var c in continuations)
                 {
-                    if (Context.TryGetNodeFor(c, out dependentNode))
+                    // TODO: need to add an adge name for visualization purposes!
+                    // Tasks created with 'ContinueWith' are different from other continuations.
+                    // In this case they're dependencies not dependents.
+                    if (Context.Registry.IsContinuationTaskFromTask(c))
                     {
-                        AddDependent(dependentNode);
+                        AddDependency(c);
+                    }
+                    else
+                    {
+                        AddDependent(c);
                     }
                 }
             }
-            
         }
 
         /// <inhertidoc />
@@ -167,6 +172,7 @@ namespace AsyncDbg.Causality
             var result = TaskKind switch
             {
                 TaskKind.FromTaskCompletionSource => Contract.AssertNotNull(_taskCompletionSource).ToString(),
+                TaskKind.ContinuationTaskFromTask => $"{base.ToStringCore()}{Environment.NewLine}ContinueWith on: {ContinueWithNameToString()}",
                 //TaskKind.AsyncMethodTask => Contract.AssertNotNull(_asyncStateMachine).ToString(),
                 // var result = $"{InsAndOuts()} [{DisplayStatus.ToString()}] {ClrInstance?.ToString(Types) ?? ""}";
                 //TaskKind.WhenAll => $"{InsAndOuts()} [{DisplayStatus.ToString()}] {ClrInstance.ToString(Types)}",
@@ -175,24 +181,23 @@ namespace AsyncDbg.Causality
             };
 
             return result;
-        }
-    }
 
-    /// <summary>
-    /// Describes kind of a task.
-    /// </summary>
-    /// <remarks>
-    /// Task type can be used for different purposes: it may be created by <see cref="TaskCompletionSource{TResult}"/>, or as part of async method, or represents a wrapper returned by <see cref="Task.Run(System.Func{Task})"/>.
-    /// </remarks>
-    public enum TaskKind
-    {
-        Unknown,
-        UnwrapPromise,
-        TaskRun,
-        WhenAll,
-        FromTaskCompletionSource,
-        AsyncMethodTask,
-        SemaphoreSlimTaskNode,
-        VisibleTaskKind = WhenAll
+            string ContinueWithNameToString()
+            {
+                // A current task node is the task created by calling ContinueWith method.
+                // So we can grab m_action field and get a "method name" that was given to ContinueWith method.
+                // Is it possible to get a method name by the method pointer?
+                var action = ClrInstance["m_action"].Instance;
+                Contract.Assert(action.IsNotNull(), "m_action field must not be null.");
+
+                var methodPtr = action["_methodPtr"].Instance;
+
+                var runtime = Context.Runtime;
+                var methodInfo = runtime.GetMethodByAddress((ulong)(long)methodPtr.Value);
+
+                var signature = methodInfo.GetFullSignature();
+                return TypeNameHelper.TrySimplifyMethodSignature(signature);
+            }
+        }
     }
 }

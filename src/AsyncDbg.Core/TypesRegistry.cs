@@ -5,12 +5,11 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using AsyncCausalityDebuggerNew;
 using AsyncDbg.Core;
-using AsyncDbgCore.New;
 using Microsoft.Diagnostics.Runtime;
 
 #nullable enable
+#nullable enable annotations
 
 namespace AsyncDbg
 {
@@ -19,9 +18,9 @@ namespace AsyncDbg
         private ClrHeap _heap => _heapContext;
 
         private readonly HeapContext _heapContext;
-        private readonly ConcurrentDictionary<string, ClrType> _fullNameToClrTypeMap = new ConcurrentDictionary<string, ClrType>();
+        private readonly ConcurrentDictionary<string, ClrType?> _fullNameToClrTypeMap = new ConcurrentDictionary<string, ClrType?>();
 
-        // s_taskCompletionSentinel instances used to determine that task is completed.
+        // s_taskCompletionSentinel instances used to determine that a task is completed.
         private readonly HashSet<ClrInstance> _taskCompletionSentinels = new HashSet<ClrInstance>(ClrInstanceAddressComparer.Instance);
 
         private readonly HashSet<TypeIndex> _typeIndices = new HashSet<TypeIndex>();
@@ -37,7 +36,6 @@ namespace AsyncDbg
         public TypeIndex ThreadIndex { get; }
         public TypeIndex TaskCompletionSourceIndex { get; }
         public TypeIndex SemaphoreSlimIndex { get; }
-        public TypeIndex SemaphoreWrapperIndex { get; }
 
         public ClrType ContinuationWrapperType { get; }
         public ClrType AsyncTaskMethodBuilderType { get; }
@@ -51,11 +49,13 @@ namespace AsyncDbg
             ContinuationWrapperType = heapContext.DefaultHeap.GetTypeByName("System.Runtime.CompilerServices.AsyncMethodBuilderCore+ContinuationWrapper");
             AsyncTaskMethodBuilderType = heapContext.DefaultHeap.GetTypeByName("System.Runtime.CompilerServices.AsyncTaskMethodBuilder");
 
-            StandardTaskContinuationType =
-                GetClrTypeByFullName("System.Threading.Tasks.StandardTaskContinuation"); // This is ContinueWith continuation
-            IAsyncStateMachineType =
-                GetClrTypeByFullName("System.Runtime.CompilerServices.IAsyncStateMachine");
-            _unwrapPromise = GetClrTypeByFullName("System.Threading.Tasks.UnwrapPromise");
+            StandardTaskContinuationType = Contract.AssertNotNull(
+                GetClrTypeByFullName("System.Threading.Tasks.StandardTaskContinuation"), "Should not be null"); // This is ContinueWith continuation
+            IAsyncStateMachineType = Contract.AssertNotNull(
+                GetClrTypeByFullName("System.Runtime.CompilerServices.IAsyncStateMachine"), "Should not be null");
+
+            _unwrapPromise = Contract.AssertNotNull(
+                GetClrTypeByFullName("System.Threading.Tasks.UnwrapPromise"), "ShouldNotBeNull");
 
             TaskIndex = CreateTypeIndex(NodeKind.Task);
             ValueTaskIndex = CreateTypeIndex(NodeKind.ValueTask);
@@ -66,7 +66,6 @@ namespace AsyncDbg
             ThreadIndex = CreateTypeIndex(NodeKind.Thread);
             TaskCompletionSourceIndex = CreateTypeIndex(NodeKind.TaskCompletionSource);
             SemaphoreSlimIndex = CreateTypeIndex(NodeKind.SemaphoreSlim);
-            SemaphoreWrapperIndex = CreateTypeIndex(NodeKind.SemaphoreWrapper, addToIndex: false);
             IAsyncStateMachineTypeIndex = CreateTypeIndex(NodeKind.AsyncStateMachine);
 
             FillTaskSentinels(_taskCompletionSentinels);
@@ -94,8 +93,6 @@ namespace AsyncDbg
         public bool IsUnwrapPromise(ClrInstance task) => ClrTypeEqualityComparer.Instance.Equals(task?.Type, _unwrapPromise);
 
         public bool IsTaskCompletionSource(ClrType? type) => type != null && (TaskCompletionSourceIndex.ContainsType(type) || type.Name.Contains("TaskSourceSlim"));
-
-        public bool IsSemaphoreWrapper(ClrType? type) => type != null && SemaphoreWrapperIndex.ContainsType(type);
 
         public bool IsAsyncStateMachine(ClrType? type) => type != null && type.Interfaces.Any(i => i.Name == IAsyncStateMachineType.Name);
 
@@ -129,14 +126,18 @@ namespace AsyncDbg
             return false;
         }
 
+        public bool IsContinuationTaskFromTask(ClrInstance c)
+        {
+            var type = c.Type;
+            return type != null && type.Name.Contains("ContinuationTaskFromTask");
+        }
+
         private void Populate()
         {
             Console.WriteLine("Analyzing the heap...");
             var sw = Stopwatch.StartNew();
 
             var counter = 0;
-
-            //var segmentHeaps = _heap.Segments.Select(s => _heapContext.CreateHeap()).ToList();
 
             // failing to cast to IDebugSystemObjects3 with parallel (race condition?)
             var parallelOptions = new ParallelOptions
@@ -194,7 +195,7 @@ namespace AsyncDbg
 
         private void FillTaskSentinels(HashSet<ClrInstance> sentinels)
         {
-            var taskType = GetClrTypeFor(typeof(Task));
+            var taskType = GetClrTypeFor(typeof(Task))!;
 
             var taskCompletionSentinelField =
                 taskType.GetStaticFieldByName("s_taskCompletionSentinel") ??
@@ -212,7 +213,7 @@ namespace AsyncDbg
             }
         }
 
-        private ClrType GetClrTypeFor(Type systemType)
+        private ClrType? GetClrTypeFor(Type systemType)
         {
             var fullName = systemType.FullName ?? throw new InvalidOperationException("Cannot find a full name for a given type.");
 
@@ -246,34 +247,24 @@ namespace AsyncDbg
 
         private ClrType GetClrTypeFor(NodeKind kind)
         {
-            switch (kind)
+            var result = kind switch
             {
-                case NodeKind.Task:
-                    return GetClrTypeFor(typeof(Task));
+                NodeKind.Task => GetClrTypeFor(typeof(Task)),
 
-                case NodeKind.ValueTask:
-                    return GetClrTypeByFullName("System.Threading.Tasks.ValueTask");
-                case NodeKind.ManualResetEventSlim:
-                    return GetClrTypeFor(typeof(ManualResetEventSlim));
-                case NodeKind.ManualResetEvent:
-                    return GetClrTypeFor(typeof(ManualResetEvent));
-                case NodeKind.AwaitTaskContinuation:
-                    return GetClrTypeByFullName("System.Threading.Tasks.AwaitTaskContinuation");
-                case NodeKind.SemaphoreSlim:
-                    return GetClrTypeFor(typeof(SemaphoreSlim));
-                case NodeKind.SemaphoreWrapper:
-                    return GetClrTypeByFullName("ContentStoreInterfaces.Synchronization.SemaphoreSlimToken");
-                case NodeKind.Thread:
-                    return GetClrTypeFor(typeof(Thread));
-                case NodeKind.BlockingObject:
-                    throw new NotSupportedException(); // todoc
-                case NodeKind.TaskCompletionSource:
-                    return GetClrTypeFor(typeof(TaskCompletionSource<>));
-                case NodeKind.AsyncStateMachine:
-                    return GetClrTypeByFullName("System.Runtime.CompilerServices.IAsyncStateMachine");
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(kind), kind, null);
-            }
+                NodeKind.ValueTask => GetClrTypeByFullName("System.Threading.Tasks.ValueTask"),
+                NodeKind.ManualResetEventSlim => GetClrTypeFor(typeof(ManualResetEventSlim)),
+                NodeKind.ManualResetEvent => GetClrTypeFor(typeof(ManualResetEvent)),
+                NodeKind.AwaitTaskContinuation => GetClrTypeByFullName("System.Threading.Tasks.AwaitTaskContinuation"),
+                NodeKind.SemaphoreSlim => GetClrTypeFor(typeof(SemaphoreSlim)),
+                NodeKind.Thread => GetClrTypeFor(typeof(Thread)),
+                NodeKind.BlockingObject => throw new NotSupportedException(), // todoc
+                NodeKind.TaskCompletionSource => GetClrTypeFor(typeof(TaskCompletionSource<>)),
+                NodeKind.AsyncStateMachine => GetClrTypeByFullName("System.Runtime.CompilerServices.IAsyncStateMachine"),
+                _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
+            };
+
+            Contract.AssertNotNull(result, $"Can't find a ClrType for NodeKind '{kind}'.");
+            return result;
         }
 
         private TypeIndex CreateTypeIndex(NodeKind kind, bool addToIndex = true)

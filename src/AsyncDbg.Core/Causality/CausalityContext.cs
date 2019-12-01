@@ -3,10 +3,9 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics.CodeAnalysis;
-using AsyncCausalityDebugger;
-using AsyncCausalityDebuggerNew;
 using AsyncDbg.Core;
 using Microsoft.Diagnostics.Runtime;
+using System.IO;
 
 #nullable enable
 
@@ -18,14 +17,6 @@ namespace AsyncDbg.Causality
 
         private readonly ConcurrentDictionary<ulong, CausalityNode> _nodesByAddress = new ConcurrentDictionary<ulong, CausalityNode>();
         private readonly Dictionary<int, ClrThread> _threadsById;
-
-        public TypeIndex AwaitTaskContinuationIndex => Registry.AwaitTaskContinuationIndex;
-
-        public TypeIndex TaskCompletionSourceIndex => Registry.TaskCompletionSourceIndex;
-
-        public ClrType ContinuationWrapperType => Registry.ContinuationWrapperType;
-
-        public ClrType StandardTaskContinuationType => Registry.StandardTaskContinuationType;
 
         public TypesRegistry Registry { get; }
 
@@ -62,7 +53,7 @@ namespace AsyncDbg.Causality
             var context = new CausalityContext(heapContext);
 
             Console.WriteLine("Linking the nodes together.");
-            context.Compute();
+            context.LinkNodes();
             return context;
         }
 
@@ -86,7 +77,7 @@ namespace AsyncDbg.Causality
             return _nodesByAddress.GetOrAdd(instance.ObjectAddress.Value, task => CausalityNode.Create(this, instance, kind: NodeKind.Unknown));
         }
 
-        public bool TryGetNodeAt(ulong address, out CausalityNode result)
+        public bool TryGetNodeAt(ulong address, [NotNullWhen(true)]out CausalityNode? result)
         {
             return _nodesByAddress.TryGetValue(address, out result);
         }
@@ -105,7 +96,7 @@ namespace AsyncDbg.Causality
             return node;
         }
 
-        public void Compute()
+        public void LinkNodes()
         {
             foreach (var node in _nodesByAddress.Values)
             {
@@ -199,20 +190,26 @@ namespace AsyncDbg.Causality
                 return writer.SerializeAsString();
             }
 
-            writer.Serialize(filePath);
-
-            return writer.SerializeAsString();
-        }
-
-        // True if the node represents a completed task/sequence of tasks. Needed because we don't want to show them.
-        public bool RanToCompletion(CausalityNode node)
-        {
-            if (!node.IsComplete)
+            if (File.Exists(filePath))
             {
-                return false;
+                var existingFile = File.ReadAllText(filePath);
+                var newFile = writer.SerializeAsString();
+
+                if (existingFile == newFile)
+                {
+                    Console.WriteLine("No changes were detected!");
+                }
+                else
+                {
+                    writer.Serialize(filePath);
+                }
+            }
+            else
+            {
+                writer.Serialize(filePath);
             }
 
-            return node.Dependencies.All(n => n.IsComplete || n.Kind == NodeKind.TaskCompletionSource || n.Kind == NodeKind.AwaitTaskContinuation || node.Kind == NodeKind.AsyncStateMachine);
+            return writer.SerializeAsString();
         }
     }
 }

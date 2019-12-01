@@ -68,8 +68,10 @@ namespace AsyncDbg.Core
             //
             // 2. Async state machine for an async lambda expression:
             // like:
-            // ManualResetEventSlimOnTheStack.Program+<>c+<<RunAsync>b__1_0>d -> lambda1
-            // ManualResetEventSlimOnTheStack.Program+<>c+<<RunAsync>b__2_1>d -> lambda2
+            // ManualResetEventSlimOnTheStack.Program+<>c+<<RunAsync>b__1_0>d -> staticLambda1
+            // ManualResetEventSlimOnTheStack.Program+<>c+<<RunAsync>b__2_1>d -> staticLambda2
+            // Program+<>c__DisplayClass1_0.<<SetCompletion>b__0>d 
+            // WaitingOnTaskCompletionSource.Program+<>c__DisplayClass1_0.<SetCompletion>b__1 -> instanceLambda2
             // 
             // 3. Async state machine for a local async method:
             // like: ManualResetEventSlimOnTheStack.Program+<<RunAsync>g__local|1_2>d
@@ -82,6 +84,8 @@ namespace AsyncDbg.Core
                 var method = match.Groups["method"].Value;
                 var suffix = match.Groups["suffix"].Value;
 
+                var lambdaKind = originalTypeName.Contains("+<>c+") ? "static" : originalTypeName.Contains("c__DisplayClass") ? "instance" : null;
+
                 string? localName = suffix switch
                 {
                     // simple async method: d__1
@@ -89,7 +93,7 @@ namespace AsyncDbg.Core
 
                     // lambda: b__1_0>d
                     // Need to add 1 to get a meaningful number of a lambda expression within the method.
-                    _ when suffix.Contains("b__") => "lambda" + (ExtractSuffixAsNumber(suffix, @"b__\d_(?<result>\d)>?.*") + 1),
+                    _ when suffix.Contains("b__") => $"{lambdaKind}Lambda" + (ExtractSuffixAsNumber(suffix, @"b__(?<result>\d).*")),
 
                     // g__local|1_2>d
                     _ when suffix.Contains("g__") => Extract(suffix, @"g__(?<result>\w+)|.+?"),
