@@ -21,23 +21,12 @@ namespace AsyncDbg.Causality
         private readonly EnhancedStackTrace? _enhancedStackTrace;
 
         /// <summary>
-        /// A list of all causaility node instances found running on the stack.
+        /// A list of all object instances of relevant types found on the stack.
         /// For instance, ReaderWriteLockSlim.Wait(), Task.Wait(), AsyncStatMachine.MoveNext etc.
+        /// We keep addresses here and not actual causality node instances, because some of the nodes may not be created
+        /// at the thread's instance construction time.
         /// </summary>
-        private readonly HashSet<(ulong address, string method)> _causailityNodesOnTheStack = new HashSet<(ulong address, string method)>();
-
-        private IEnumerable<(CausalityNode node, string method)> GetCausalityNodesOnTheStack()
-        {
-            foreach (var (address, method) in _causailityNodesOnTheStack)
-            {
-                if (Context.TryGetNodeAt(address, out var node))
-                {
-                    yield return (node, method);
-                }
-            }
-        }
-
-        private int StackTraceLength => _clrThread?.StackTrace.Count ?? 0;
+        private readonly HashSet<(ClrInstance clrInstance, string method)> _objectsOnTheStack = new HashSet<(ClrInstance clrInstance, string method)>();
 
         /// <nodoc />
         public ThreadNode(CausalityContext context, ClrInstance thread)
@@ -64,15 +53,18 @@ namespace AsyncDbg.Causality
                     continue;
                 }
 
-                ulong? causalityNodesAddress = FindCausalityNode(clrThread, stackFrame, type);
-                if (causalityNodesAddress != null && methodName != null)
+                ClrInstance? clrInstance = FindInstanceAddressOfType(clrThread, stackFrame, type);
+                if (clrInstance != null && methodName != null)
                 {
-                    _causailityNodesOnTheStack.Add((address: causalityNodesAddress.Value, method: methodName));
+                    _objectsOnTheStack.Add((clrInstance: clrInstance, method: methodName));
                 }
             }
         }
 
-        private ulong? FindCausalityNode(ClrThread thread, ClrStackFrame frame, ClrType expectedType)
+        /// <summary>
+        /// Finds a Clr instance of a given type that lives on the stack and returns an address of the instance in the heap.
+        /// </summary>
+        private ClrInstance? FindInstanceAddressOfType(ClrThread thread, ClrStackFrame frame, ClrType expectedType)
         {
             foreach (ulong ptr in EnumeratePointersForThreadFrame(thread, frame))
             {
@@ -84,10 +76,12 @@ namespace AsyncDbg.Causality
                     }
 
                     ClrType type = _runtime.Heap.GetObjectType(address);
-                    
+
+                    // Expected type can be a base type or an interface.
+                    // So we need to check if the curren
                     if (type.EnumerateBaseTypesAndSelf().Contains(expectedType))
                     {
-                        return address;
+                        return ClrInstance.CreateInstance(_runtime.Heap, address, type);
                     }
                 }
             }
@@ -123,7 +117,7 @@ namespace AsyncDbg.Causality
         }
 
         /// <inheritdoc />
-        public override bool IsComplete => Dependencies.All(d => d.IsComplete) && StackTraceLength == 0;
+        public override bool IsComplete => Dependencies.All(d => d.IsComplete) && (_clrThread?.StackTrace.Count ?? 0) == 0;
 
         /// <inheritdoc />
         protected override string ToStringCore()
@@ -172,6 +166,17 @@ namespace AsyncDbg.Causality
 
                 }
             };
+        }
+
+        private IEnumerable<(CausalityNode node, string method)> GetCausalityNodesOnTheStack()
+        {
+            foreach (var (clrInstance, method) in _objectsOnTheStack)
+            {
+                if (Context.TryGetNodeFor(clrInstance, out var node))
+                {
+                    yield return (node, method);
+                }
+            }
         }
 
         private static ClrThread? TryGetClrThread(CausalityContext context, ClrInstance instance)
