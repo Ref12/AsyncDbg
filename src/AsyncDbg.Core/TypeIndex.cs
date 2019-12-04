@@ -15,16 +15,19 @@ namespace AsyncDbg
 
         public NodeKind Kind { get; }
 
-        public ClrType RootType { get; }
+        public ClrType? RootType { get; }
 
         public IReadOnlyCollection<ClrInstance> Instances => _instances;
 
-        public TypeIndex(ClrType rootType, NodeKind kind)
+        public TypeIndex(ClrType? rootType, NodeKind kind)
         {
             RootType = rootType;
             Kind = kind;
 
-            _derivedTypesAndRoot.Add(rootType);
+            if (rootType != null)
+            {
+                _derivedTypesAndRoot.Add(rootType);
+            }
         }
 
         public bool AddIfDerived(ClrType type)

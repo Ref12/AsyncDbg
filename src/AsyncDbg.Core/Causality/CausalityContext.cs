@@ -160,29 +160,21 @@ namespace AsyncDbg.Causality
         {
             var writer = new DgmlWriter();
 
-            var useOld = false;
             Console.WriteLine("Analyzing the async graphs...");
-            if (!useOld)
-            {
-                var visualContext = VisuaNodes.VisualContext.Create(this);
+            var visualContext = VisuaNodes.VisualContext.Create(Nodes, simplify: false);
 
-                foreach (var node in visualContext.EnumerateVisualNodes())
+            foreach (var node in visualContext.EnumerateVisualNodes())
+            {
+                writer.AddNode(new DgmlWriter.Node(id: node.Id, label: node.DisplayText));
+
+                //foreach (var dependency in node.Dependencies.OrderBy(d => d.Id))
+                foreach (var dependency in node.AwaitsOn)
                 {
-                    writer.AddNode(new DgmlWriter.Node(id: node.Id, label: node.DisplayText));
-
-                    //foreach (var dependency in node.Dependencies.OrderBy(d => d.Id))
-                    foreach (var dependency in node.AwaitsOn)
-                    {
-                        writer.AddLink(new DgmlWriter.Link(
-                            source: node.Id,
-                            target: dependency.Id,
-                            label: null));
-                    }
+                    writer.AddLink(new DgmlWriter.Link(
+                        source: node.Id,
+                        target: dependency.Id,
+                        label: null));
                 }
-            }
-            else
-            {
-                throw new NotSupportedException("The version code is no longer supported!");
             }
 
             if (whatIf)
@@ -201,6 +193,7 @@ namespace AsyncDbg.Causality
                 }
                 else
                 {
+                    Console.WriteLine("The diagram has changaed!");
                     writer.Serialize(filePath);
                 }
             }

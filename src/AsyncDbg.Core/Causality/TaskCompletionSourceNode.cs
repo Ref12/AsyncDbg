@@ -16,8 +16,6 @@ namespace AsyncDbg.Causality
         /// <inheritdoc />
         public override bool IsComplete => UnderlyingTaskNode.IsComplete;
 
-        public override bool Visible => false;
-
         /// <inheritdoc />
         protected override string ToStringCore()
         {
@@ -31,7 +29,7 @@ namespace AsyncDbg.Causality
         {
             get
             {
-                TaskNode? result = (TaskNode?)TryGetNodeFor(ClrInstance["m_task"].Instance);
+                TaskNode? result = (TaskNode?)TryGetCausalityNodeFor(ClrInstance["m_task"].Instance);
                 Contract.AssertNotNull(result);
                 return result;
             }

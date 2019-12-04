@@ -13,26 +13,24 @@ namespace AsyncDbg.VisuaNodes
     {
         // If visual node consists of multiple causality nodes,
         // then we need to track the last causality node that contains actual set of dependencies.
-        private readonly CausalityNode _lastOrSingleCausalityNode;
+        private readonly ICausalityNode _lastOrSingleCausalityNode;
         private readonly HashSet<VisualNode> _awaitsOn = new HashSet<VisualNode>();
 
         public string Id { get; }
         public string DisplayText { get; }
-        public HashSet<CausalityNode> CausalityNodes { get; }
-        public Lazy<Guid> Key { get; }
+        public HashSet<ICausalityNode> CausalityNodes { get; }
 
-        public VisualNode(string id, string displayText, Lazy<Guid> key, params CausalityNode[] nodes)
+        public VisualNode(string id, string displayText, params ICausalityNode[] nodes)
         {
             Contract.Requires(nodes.Length != 0, "nodes.Length != 0");
 
             Id = id;
             DisplayText = displayText;
             _lastOrSingleCausalityNode = nodes.Last();
-            CausalityNodes = new HashSet<CausalityNode>(nodes);
-            Key = key;
+            CausalityNodes = new HashSet<ICausalityNode>(nodes);
         }
 
-        public static VisualNode Create(params CausalityNode[] nodes)
+        public static VisualNode Create(params ICausalityNode[] nodes)
         {
             Contract.Requires(nodes.Length != 0, "nodes.Length != 0");
 
@@ -43,17 +41,19 @@ namespace AsyncDbg.VisuaNodes
 
             if (nodes.Length > 1)
             {
-                displayText = string.Join($"{NewLine}|{NewLine}", nodes.Reverse().Where(n => n.Visible).Select(n => n.ToString()));
+                displayText = string.Join($"{NewLine}|{NewLine}", nodes.Reverse().Where(n => IsVisible(n)).Select(n => n.ToString()));
             }
             else
             {
                 displayText = nodes[0].ToString();
             }
 
-            return new VisualNode(id, displayText, nodes[0].Key, nodes);
+            return new VisualNode(id, displayText, nodes);
         }
 
-        public void MaterializeDependencies(Dictionary<CausalityNode, VisualNode> visualMap)
+        private static bool IsVisible(ICausalityNode node) => true;
+
+        public void MaterializeDependencies(Dictionary<ICausalityNode, VisualNode> visualMap)
         {
             // TODO: add VisualMap type that will fail with more readable error message
             // when the indexer like visualMap[d] fails with key not found.
@@ -74,7 +74,7 @@ namespace AsyncDbg.VisuaNodes
 
         public static VisualNode Create(CausalityNode causalityNode)
         {
-            return new VisualNode(causalityNode.Id, causalityNode.ToString(), causalityNode.Key, causalityNode);
+            return new VisualNode(causalityNode.Id, causalityNode.ToString(), causalityNode);
         }
 
         public IEnumerable<VisualNode> EnumerateAwaitsOnAndSelf()
@@ -104,5 +104,19 @@ namespace AsyncDbg.VisuaNodes
                 }
             }
         }
+
+        public Guid ComputeKey()
+        {
+            return Guid.NewGuid();
+            //Murmur3 murmur = new Murmur3();
+            //var bytes = Encoding.UTF8.GetBytes(ClrInstance.AddressRegex.Replace(ToString(), ""));
+
+            //var dependencies = EnumerateDependenciesAndSelfDepthFirst();
+            //var hash = dependencies.Select(t => Encoding.UTF8.GetBytes(ClrInstance.AddressRegex.Replace(t.ToString(), "")));
+            //// Hash dependencies nodes and normalized display text for self
+            //return murmur.ComputeHash(hash.Select(ba => new ArraySegment<byte>(ba))).AsGuid();
+        }
+
+
     }
 }

@@ -58,7 +58,7 @@ namespace AsyncDbg
                 GetClrTypeByFullName("System.Threading.Tasks.UnwrapPromise"), "ShouldNotBeNull");
 
             TaskIndex = CreateTypeIndex(NodeKind.Task);
-            ValueTaskIndex = CreateTypeIndex(NodeKind.ValueTask);
+            ValueTaskIndex = CreateTypeIndex(NodeKind.ValueTask, isOptional: true); // value task types can be missing depending on framework version.
             ManualResetEventSlimIndex = CreateTypeIndex(NodeKind.ManualResetEventSlim);
             ManualResetEventIndex = CreateTypeIndex(NodeKind.ManualResetEvent);
             AwaitTaskContinuationIndex = CreateTypeIndex(NodeKind.AwaitTaskContinuation);
@@ -245,7 +245,7 @@ namespace AsyncDbg
             });
         }
 
-        private ClrType GetClrTypeFor(NodeKind kind)
+        private ClrType? GetClrTypeFor(NodeKind kind)
         {
             var result = kind switch
             {
@@ -263,12 +263,17 @@ namespace AsyncDbg
                 _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
             };
 
-            Contract.AssertNotNull(result, $"Can't find a ClrType for NodeKind '{kind}'.");
             return result;
         }
 
-        private TypeIndex CreateTypeIndex(NodeKind kind, bool addToIndex = true)
+        private TypeIndex CreateTypeIndex(NodeKind kind, bool addToIndex = true, bool isOptional = false)
         {
+            var clrType = GetClrTypeFor(kind);
+            if (!isOptional)
+            {
+                Contract.AssertNotNull(clrType, $"Can't find a type for non-optional node kind '{kind}'.");
+            }
+
             var result = new TypeIndex(GetClrTypeFor(kind), kind);
 
             if (addToIndex)

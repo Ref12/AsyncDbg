@@ -24,7 +24,18 @@ namespace AsyncDbg.Causality
         /// A list of all causaility node instances found running on the stack.
         /// For instance, ReaderWriteLockSlim.Wait(), Task.Wait(), AsyncStatMachine.MoveNext etc.
         /// </summary>
-        private readonly HashSet<(CausalityNode node, string method)> _causailityNodesOnTheStack = new HashSet<(CausalityNode node, string method)>();
+        private readonly HashSet<(ulong address, string method)> _causailityNodesOnTheStack = new HashSet<(ulong address, string method)>();
+
+        private IEnumerable<(CausalityNode node, string method)> GetCausalityNodesOnTheStack()
+        {
+            foreach (var (address, method) in _causailityNodesOnTheStack)
+            {
+                if (Context.TryGetNodeAt(address, out var node))
+                {
+                    yield return (node, method);
+                }
+            }
+        }
 
         private int StackTraceLength => _clrThread?.StackTrace.Count ?? 0;
 
@@ -48,33 +59,47 @@ namespace AsyncDbg.Causality
             {
                 ClrType? type = stackFrame.Method?.Type;
                 string? methodName = stackFrame.Method?.Name;
-                if (type == null && methodName == null)
+                if (type == null)
                 {
                     continue;
                 }
 
-                CausalityNode? causalityNode = FindCausalityNode(clrThread.StackLimit, stackFrame.StackPointer);
-                if (causalityNode != null && methodName != null)
+                ulong? causalityNodesAddress = FindCausalityNode(clrThread, stackFrame, type);
+                if (causalityNodesAddress != null && methodName != null)
                 {
-                    _causailityNodesOnTheStack.Add((node: causalityNode, method: methodName));
+                    _causailityNodesOnTheStack.Add((address: causalityNodesAddress.Value, method: methodName));
                 }
             }
         }
 
-        private CausalityNode? FindCausalityNode(ulong start, ulong stop)
+        private ulong? FindCausalityNode(ClrThread thread, ClrStackFrame frame, ClrType expectedType)
         {
-            foreach (ulong ptr in EnumeratePointersInRange(start, stop))
+            foreach (ulong ptr in EnumeratePointersForThreadFrame(thread, frame))
             {
                 if (_runtime.ReadPointer(ptr, out ulong address))
                 {
-                    if (Context.TryGetNodeAt(address, out var result))
+                    if (!_runtime.Heap.IsInHeap(address))
                     {
-                        return result;
+                        continue;
+                    }
+
+                    ClrType type = _runtime.Heap.GetObjectType(address);
+                    
+                    if (type.EnumerateBaseTypesAndSelf().Contains(expectedType))
+                    {
+                        return address;
                     }
                 }
             }
 
             return null;
+        }
+
+        private IEnumerable<ulong> EnumeratePointersForThreadFrame(ClrThread thread, ClrStackFrame frame)
+        {
+            // Not sure why we need to do that, but it seems that this is the pattern used for instance here: https://github.com/HarmJ0y/KeeThief/blob/master/KeeTheft/ClrMD/src/Microsoft.Diagnostics.Runtime/Desktop/lockinspection.cs
+            return EnumeratePointersInRange(thread.StackLimit, frame.StackPointer)
+                .Concat(EnumeratePointersInRange(frame.StackPointer, thread.StackBase));
         }
 
         private IEnumerable<ulong> EnumeratePointersInRange(ulong start, ulong stop)
@@ -120,7 +145,7 @@ namespace AsyncDbg.Causality
         {
             base.Link();
 
-            foreach ((CausalityNode node, string method) in _causailityNodesOnTheStack)
+            foreach ((CausalityNode node, string method) in GetCausalityNodesOnTheStack())
             {
                 switch (node, method)
                 {

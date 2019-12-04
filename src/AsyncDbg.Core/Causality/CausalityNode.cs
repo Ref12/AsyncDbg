@@ -1,66 +1,45 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using AsyncDbg.Core;
 
 #nullable enable
 
 namespace AsyncDbg.Causality
 {
-    public class CausalityNode
+    public class CausalityNode : ICausalityNode
     {
         protected readonly CausalityContext Context;
-
-        protected TypesRegistry Types => Context.Registry;
 
         /// <summary>
         /// A CLR object instance that backs the current causality node.
         /// </summary>
-        public ClrInstance ClrInstance { get; }
-
-        public CausalityNode? CompletionSourceTaskNode { get; private set; }
-
-        public Lazy<Guid> Key { get; }
-
-        public bool IsRoot
-        {
-            get
-            {
-                if (Dependents.Count == 0) { return true; }
-
-                if (this is ThreadNode) { return true; }
-
-                if (this is AsyncStateMachineNode stateMachine && stateMachine.Dependents.Count != 0) { return true; }
-
-                //if (Dependents.Count == 0) return true;
-                return false;
-            }
-        }
-
-        public bool IsLeaf => Dependencies.Count == 0;
+        protected readonly ClrInstance ClrInstance;
 
         /// <summary>
-        /// Some nodes in the async graph are auxiliary and should not be visible.
-        /// For instance, TaskCompletionSource instance and the underlying Task instance
-        /// are tightly coupled together and only one of them should be printed out.
+        /// A set of causaility nodes waiting (or awaiting, or blocked on) the current node.
         /// </summary>
-        public virtual bool Visible => true;
+        public HashSet<ICausalityNode> Dependencies { get; } = new HashSet<ICausalityNode>();
 
-        public readonly HashSet<CausalityNode> Dependencies = new HashSet<CausalityNode>();
-        public readonly HashSet<CausalityNode> Dependents = new HashSet<CausalityNode>();
+        /// <summary>
+        /// A set of causality nodes that the current node unblocks.
+        /// </summary>
+        public HashSet<ICausalityNode> Dependents { get; } = new HashSet<ICausalityNode>();
 
-        public HashSet<CausalityNode> WaitingOn => Dependencies;
+        /// <summary>
+        /// A unique identity of the current causality node.
+        /// </summary>
+        public string Id { get; }
 
-        public HashSet<CausalityNode> Unblocks => Dependents;
+        /// <nodoc />
+        public NodeKind Kind { get; }
 
         protected CausalityNode(CausalityContext context, ClrInstance clrInstance, NodeKind kind)
         {
             Context = context;
             ClrInstance = clrInstance;
 
-            Id = clrInstance.ValueOrDefault?.ToString() ?? string.Empty;
+            Id = Contract.AssertNotNull(clrInstance.ValueOrDefault?.ToString(), "ValueOrDefault should not be null");
             Kind = kind;
-            Key = new Lazy<Guid>(() => ComputeKey());
         }
 
         public static CausalityNode Create(CausalityContext context, ClrInstance clrInstance, NodeKind kind)
@@ -78,9 +57,19 @@ namespace AsyncDbg.Causality
             };
         }
 
+        public virtual bool IsComplete => false; // Derive types should override the result.
+
+        protected virtual string DisplayStatus
+        {
+            get
+            {
+                return Kind.ToString();
+            }
+        }
+
         private static T Return<T>(Func<T> provider) => provider();
 
-        protected CausalityNode? TryGetNodeFor(ClrInstance? instance)
+        protected CausalityNode? TryGetCausalityNodeFor(ClrInstance? instance)
         {
             if (instance == null)
             {
@@ -105,71 +94,6 @@ namespace AsyncDbg.Causality
             return $"{prefix} {mainText} {suffix}";
         }
 
-        public IEnumerable<CausalityNode> EnumerateDependenciesAndSelfDepthFirst()
-        {
-            return EnumerateNeighborsAndSelfDepthFirst(n => n.Dependencies);
-        }
-
-        public IEnumerable<CausalityNode> EnumerateNeighborsAndSelfDepthFirst()
-        {
-            return EnumerateNeighborsAndSelfDepthFirst(n => n.Dependencies.Concat(n.Dependents));
-        }
-
-        public Guid ComputeKey()
-        {
-            return Guid.NewGuid();
-            //Murmur3 murmur = new Murmur3();
-            //var bytes = Encoding.UTF8.GetBytes(ClrInstance.AddressRegex.Replace(ToString(), ""));
-
-            //var dependencies = EnumerateDependenciesAndSelfDepthFirst();
-            //var hash = dependencies.Select(t => Encoding.UTF8.GetBytes(ClrInstance.AddressRegex.Replace(t.ToString(), "")));
-            //// Hash dependencies nodes and normalized display text for self
-            //return murmur.ComputeHash(hash.Select(ba => new ArraySegment<byte>(ba))).AsGuid();
-        }
-
-        public IEnumerable<CausalityNode> EnumerateNeighborsAndSelfDepthFirst(Func<CausalityNode, IEnumerable<CausalityNode>> getNeighbors)
-        {
-            var enumeratedSet = new HashSet<CausalityNode>();
-
-            // Using queue to get depth first left to right traversal. Stack would give right to left traversal.
-            // TODO: explain why depth first is so important!
-            var queue = new Stack<CausalityNode>();
-
-            queue.Push(this);
-
-            while (queue.Count > 0)
-            {
-                var next = queue.Pop();
-
-                if (enumeratedSet.Contains(next))
-                {
-                    continue;
-                }
-
-                enumeratedSet.Add(next);
-                yield return next;
-
-                foreach (var n in getNeighbors(next))
-                {
-                    queue.Push(n);
-                }
-            }
-        }
-
-        public string Id { get; }
-
-        public NodeKind Kind { get; }
-
-        public virtual bool IsComplete => false; // Derive types should override the result.
-
-        protected virtual string DisplayStatus
-        {
-            get
-            {
-                return Kind.ToString();
-            }
-        }
-
         public virtual void Link()
         {
 
@@ -178,6 +102,11 @@ namespace AsyncDbg.Causality
         protected void AddDependency(ClrInstance dependency)
         {
             AddEdge(dependency: Context.GetNode(dependency), dependent: this);
+        }
+
+        protected void AddDependency(CausalityNode dependency)
+        {
+            AddEdge(dependency: dependency, dependent: this);
         }
 
         protected void AddDependent(ClrInstance dependent)
@@ -192,7 +121,7 @@ namespace AsyncDbg.Causality
 
         protected virtual bool AddEdge(CausalityNode dependency, CausalityNode dependent)
         {
-            if (dependency.ClrInstance?.IsNull == true || dependency.ClrInstance?.IsNull == true)
+            if (dependency.ClrInstance?.IsNull == true || dependent.ClrInstance?.IsNull == true)
             {
                 // Can't add edge to nothing
                 return false;
@@ -215,10 +144,9 @@ namespace AsyncDbg.Causality
             return ToStringCore();
         }
 
-        //protected virtual string 
         protected virtual string ToStringCore()
         {
-            var result = $"{InsAndOuts()} [{DisplayStatus.ToString()}] {ClrInstance?.ToString(Types) ?? ""}";
+            var result = $"{InsAndOuts()} [{DisplayStatus.ToString()}] {ClrInstance?.ToString(Context.Registry) ?? ""}";
 
             return result;
         }

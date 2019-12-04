@@ -10,10 +10,6 @@ namespace AsyncDbg.Causality
         public ManualResetEventSlimNode(CausalityContext context, ClrInstance clrInstance)
             : base(context, clrInstance, NodeKind.ManualResetEventSlim)
         {
-            
         }
-
-        /// <inheritdoc />
-        public override bool Visible => true;
     }
 }

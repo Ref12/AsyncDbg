@@ -24,7 +24,7 @@ namespace AsyncDbg.Causality
         {
             foreach (var asyncWaiter in _asyncWaiters)
             {
-                if (TryGetNodeFor(asyncWaiter) is TaskNode taskNode)
+                if (TryGetCausalityNodeFor(asyncWaiter) is TaskNode taskNode)
                 {
                     taskNode.SetSemaphoreSlim(this);
                     AddDependent(asyncWaiter);

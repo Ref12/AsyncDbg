@@ -44,11 +44,11 @@ namespace AsyncDbg.Causality
 
                 if (_asyncStateMachine != null) { return TaskKind.AsyncMethodTask; }
 
-                if (Types.IsTaskWhenAll(ClrInstance)) { return TaskKind.WhenAll; }
+                if (Context.Registry.IsTaskWhenAll(ClrInstance)) { return TaskKind.WhenAll; }
 
                 if (_semaphoreSlimNode != null) { return TaskKind.SemaphoreSlimTaskNode; }
 
-                if (Types.IsUnwrapPromise(ClrInstance))
+                if (Context.Registry.IsUnwrapPromise(ClrInstance))
                 {
                     // There are two unwrap promises:
                     // One is used in Task.Unwrap() extension method
@@ -171,7 +171,7 @@ namespace AsyncDbg.Causality
         {
             var result = TaskKind switch
             {
-                TaskKind.FromTaskCompletionSource => Contract.AssertNotNull(_taskCompletionSource).ToString(),
+                //TaskKind.FromTaskCompletionSource => Contract.AssertNotNull(_taskCompletionSource).ToString(),
                 TaskKind.ContinuationTaskFromTask => $"{base.ToStringCore()}{Environment.NewLine}ContinueWith on: {ContinueWithNameToString()}",
                 //TaskKind.AsyncMethodTask => Contract.AssertNotNull(_asyncStateMachine).ToString(),
                 // var result = $"{InsAndOuts()} [{DisplayStatus.ToString()}] {ClrInstance?.ToString(Types) ?? ""}";

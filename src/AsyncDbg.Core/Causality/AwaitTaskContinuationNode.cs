@@ -1,4 +1,5 @@
 ﻿using AsyncDbg.Core;
+using System;
 
 #nullable enable
 
@@ -36,15 +37,44 @@ namespace AsyncDbg.Causality
         {
             var continuation = ContinuationObject;
 
-            // Await task continuation usually points to a state machine.
-            if (SyncContext != null && TryGetNodeFor(continuation) is AsyncStateMachineNode asyncStateMachine)
+            // Establishing the edge like: 'async state machine -> await task continuation',
+            // because the conituation usually points to MoveNextRunner that moves a given state machine forward.
+
+            if (continuation != null)
             {
-                asyncStateMachine.SetSyncContext(SyncContext);
+                // TODO: maybe add a name of the link: like 'Runs IAsyncStateMachine.MoveNext'
+                AddDependent(continuation);
             }
-            else if (continuation != null)
+
+            // Now we can do the following trick and explore the sync context.
+            // Maybe it has some fields that are relevant for us. For instance, AsyncReaderWriterLock uses a sync context to limit the concurrency
+            // so the sync context points to a semaphore slim.
+
+            if (SyncContext != null)
             {
-                AddDependency(continuation);
+                foreach (var f in SyncContext.Fields)
+                {
+                    if (Context.TryGetNodeFor(f.Instance, out var dependency))
+                    {
+                        // TODO: maybe add a name for the link, something like 'from SyncContext'.
+                        // TODO: another option is to add sync context as a separate node here!
+                        AddDependency(dependency);
+                    }
+                }
             }
+        }
+
+        /// <inheritdoc />
+        protected override string ToStringCore()
+        {
+            var result = base.ToStringCore();
+
+            if (SyncContext != null)
+            {
+                result += $"{Environment.NewLine}(with sync context: {SyncContext.Type?.TypeToString(Context.Registry)})";
+            }
+
+            return result;
         }
     }
 }

@@ -8,6 +8,8 @@
 - Support ITaskSource
 - Parallel.For
 
+Add SynchronizationContext as a separate entity!
+
 # Features
 - Add overall stats
 - Console-based output

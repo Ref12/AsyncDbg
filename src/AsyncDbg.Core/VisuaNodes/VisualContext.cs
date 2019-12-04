@@ -10,66 +10,92 @@ namespace AsyncDbg.VisuaNodes
 {
     public class VisualContext
     {
-        private readonly Dictionary<Guid, AsyncGraph> _uniqueAsyncGraphs = new Dictionary<Guid, AsyncGraph>();
-        private readonly Dictionary<CausalityNode, VisualNode> _visualMap = new Dictionary<CausalityNode, VisualNode>();
+        private readonly Dictionary<Guid, AsyncGraph> _uniqueRelevantAsyncGraphs = new Dictionary<Guid, AsyncGraph>();
+        //private readonly Dictionary<ICausalityNode, VisualNode> _visualMap = new Dictionary<ICausalityNode, VisualNode>();
 
         // Each causaility node belongs only to one async graph. This map tracks this information.
-        private readonly Dictionary<CausalityNode, AsyncGraph> _nodeToAsyncGraphMap = new Dictionary<CausalityNode, AsyncGraph>();
+        //private readonly Dictionary<ICausalityNode, AsyncGraph> _nodeToAsyncGraphMap = new Dictionary<ICausalityNode, AsyncGraph>();
 
         // Each causaility node belongs only to one async graph. This map tracks this information.
-        private readonly Dictionary<VisualNode, AsyncGraph> _visualNodeToAsyncGraphMap = new Dictionary<VisualNode, AsyncGraph>();
+        //private readonly Dictionary<VisualNode, AsyncGraph> _visualNodeToAsyncGraphMap = new Dictionary<VisualNode, AsyncGraph>();
+        private readonly List<AsyncGraph> _asyncGraphs;
 
-        /// <summary>
-        /// Creates a new async graph from the given root.
-        /// </summary>
-        /// <remarks>
-        /// If a given node represents a part of the graph that joins an existing async graph, then this method
-        /// will update an existing graph instead of creating a new one.
-        /// For instance, if two threads are waiting on a single task, we'll have two root nodes for a single async graph:
-        /// <code>
-        /// T1           T2
-        /// |-> TSC(0) <-|
-        /// </code>
-        /// </remarks>
-        public AsyncGraph Add(CausalityNode root)
+        public VisualContext(List<AsyncGraph> asyncGraphs)
         {
-            Contract.Requires(root.IsRoot, "AsyncGraph can be created from a root node only.");
+            _asyncGraphs = asyncGraphs;
+            var relevantAsyncGraphs = asyncGraphs.Where(graph => IsRelevant(graph)).ToList();
 
-            var graph = _nodeToAsyncGraphMap.GetOrAdd(root, () => new AsyncGraph());
-            var visualRoot = CreateVisualNode(root, graph, _visualMap);
-            graph.AddRoot(visualRoot);
-
-            return graph;
-            //if (!_nodeToAsyncGraphMap.TryGetValue(root, out var existingGraph))
-            //{
-            //    existingGraph.AddRoot(_visualMap[root]);
-            //    return existingGraph;
-            //}
-            //else
-            //{
-            //    var graph = new AsyncGraph();
-            //    var visualRoot = CreateVisualNode(root, graph, _visualMap);
-            //    graph.AddRoot(visualRoot);
-            //    return graph;
-            //}
+            _uniqueRelevantAsyncGraphs = relevantAsyncGraphs.ToDictionary(graph => ComputeGraphKey(graph), graph => graph);
         }
 
-        private VisualNode CreateVisualNode(CausalityNode root, AsyncGraph graph, Dictionary<CausalityNode, VisualNode> map)
+        public static VisualContext Create(IEnumerable<ICausalityNode> causalityNodes, bool simplify = false)
         {
-            if (map.TryGetValue(root, out var visualRoot))
+            var rawGraphs = SplitNodesIntoGraphs(causalityNodes);
+
+            var asyncGraphs = rawGraphs.Select(nodes => CreateGraph(nodes, simplify)).ToList();
+
+            return new VisualContext(asyncGraphs);
+        }
+
+        public IEnumerable<AsyncGraph> GetAsyncGraphs() => _uniqueRelevantAsyncGraphs.Values;
+
+        public IEnumerable<VisualNode> EnumerateVisualNodes()
+        {
+            foreach (var graph in _uniqueRelevantAsyncGraphs.Values)
             {
-                return visualRoot;
+                foreach (var n in graph.VisualNodes)
+                {
+                    yield return n;
+                }
+            }
+        }
+
+        private static List<List<ICausalityNode>> SplitNodesIntoGraphs(IEnumerable<ICausalityNode> nodes)
+        {
+            var processedNodes = new HashSet<ICausalityNode>();
+            var rawGraphs = new List<List<ICausalityNode>>();
+
+            foreach (var node in nodes)
+            {
+                if (!processedNodes.Contains(node))
+                {
+                    // The current not is not yet processed.
+                    var rawGraph = new List<ICausalityNode>();
+                    // Now we enumerate all the neighbor nodes of the current node
+                    foreach (var n in node.EnumerateNeighborsAndSelfDepthFirst())
+                    {
+                        processedNodes.Add(n);
+                        rawGraph.Add(n);
+                    }
+
+                    rawGraphs.Add(rawGraph);
+                }
             }
 
+            return rawGraphs;
+        }
+
+        private static AsyncGraph CreateGraph(List<ICausalityNode> nodes, bool simplify)
+        {
             // A -> B -> C -> D => (A,B,C) -> D
             //           | -> F          | -> F
 
             // Prepopulating CausalityNode -> VisualNode map.
-            var collapseable = new List<CausalityNode>();
-            var visualNodes = new HashSet<VisualNode>();
-            var allNodes = root.EnumerateNeighborsAndSelfDepthFirst().ToList();
+            var collapseable = new List<ICausalityNode>();
+            var visualNodes = new List<VisualNode>();
+            var allNodes = nodes;
 
-            CausalityNode? previousNode = null;
+            // If we have a root node, we'll start from it, because in this case the node simplification will produce
+            // better result.
+            var root = nodes.FirstOrDefault(n => n.IsRoot());
+
+            if (root != null)
+            {
+                allNodes = root.EnumerateNeighborsAndSelfDepthFirst().ToList();
+            }
+
+            var map = new Dictionary<ICausalityNode, VisualNode>();
+            ICausalityNode? previousNode = null;
             foreach (var node in allNodes)
             {
                 if (collapseable.Count != 0 && shouldCollapse(previousNode, node))
@@ -77,17 +103,18 @@ namespace AsyncDbg.VisuaNodes
                     createCompositeVisualNode();
                 }
 
-                if (isCollapseable(previousNode, node))
+                if (simplify && isCollapseable(previousNode, node))
                 {
                     collapseable.Add(node);
                 }
                 else
                 {
-                    var visualNode = map.GetOrAdd(node, n => VisualNode.Create(n));
-
-                    visualNodes.Add(visualNode);
-                    _nodeToAsyncGraphMap[node] = graph;
-                    _visualNodeToAsyncGraphMap[visualNode] = graph;
+                    if (!map.ContainsKey(node))
+                    {
+                        var visualNode = VisualNode.Create(node);
+                        map.Add(node, visualNode);
+                        visualNodes.Add(visualNode);
+                    }
                 }
 
                 previousNode = node;
@@ -101,8 +128,7 @@ namespace AsyncDbg.VisuaNodes
                 visualNode.MaterializeDependencies(map);
             }
 
-            var result = map[root];
-            return result;
+            return new AsyncGraph(visualNodes);
 
             void createCompositeVisualNode()
             {
@@ -113,19 +139,19 @@ namespace AsyncDbg.VisuaNodes
 
                 var visual = VisualNode.Create(collapseable.ToArray());
                 visualNodes.Add(visual);
+
                 // associate all collapsed nodes with visualNode
                 map.TryAddRange(collapseable, visual);
                 collapseable.Clear();
             }
 
-            bool isCollapseable(CausalityNode? previousNode, CausalityNode node)
+            static bool isCollapseable(ICausalityNode? previousNode, ICausalityNode node)
             {
-                return false;
-                //var isCollapsable = node.Dependencies.Count <= 1 && node.Kind != NodeKind.Thread;
-                //return isCollapsable;
+                var isCollapsable = node.Dependencies.Count <= 1 && node.Kind != NodeKind.Thread;
+                return isCollapsable;
             }
 
-            bool shouldCollapse(CausalityNode? previousNode, CausalityNode node)
+            static bool shouldCollapse(ICausalityNode? previousNode, ICausalityNode node)
             {
                 var shouldCollapse = node.Dependencies.Count > 1 || node.Dependents.Count > 1
                     || previousNode != null && !previousNode.Dependencies.Contains(node);
@@ -133,72 +159,40 @@ namespace AsyncDbg.VisuaNodes
             }
         }
 
-        public static VisualContext Create(CausalityContext causalityContext)
+        private static Guid ComputeGraphKey(AsyncGraph graph)
         {
-            var roots = causalityContext.Nodes.Where(n => n.IsRoot).ToList();
-
-            var visualContext = new VisualContext();
-
-            List<AsyncGraph> asyncGraphs = new List<AsyncGraph>();
-
-            foreach(var root in roots)
-            {
-                var graph = visualContext.Add(root);
-                asyncGraphs.Add(graph);
-            }
-
-            foreach(var grph in asyncGraphs)
-            {
-                if (IsRelevant(grph))
-                {
-                    if (!visualContext._uniqueAsyncGraphs.ContainsKey(grph.Key))
-                    {
-                        var key = grph.Roots.First().CausalityNodes.First().ComputeKey();
-                        visualContext._uniqueAsyncGraphs.Add(grph.Key, grph);
-                    }
-                    else
-                    {
-
-                    }
-                }
-            }
-
-            return visualContext;
+            return Guid.NewGuid();
+            //var murmur = new Murmur3();
+            //return murmur.ComputeHash(_roots.Keys.Select(k => k.ToByteArray()).Select(ba => new ArraySegment<byte>(ba))).AsGuid();
         }
 
         private static bool IsRelevant(AsyncGraph graph)
         {
             var causalityNodes = graph.EnumerateCausalityNodes().ToHashSet();
+
             // Filtering out empty graphs or fully completed ones.
             // One cases that falls into this bucket is async state machines allocated in debug builds.
             // In this case they're allocated, but useless becuase they're not even started.
             // (Just a reminder, in debug builds state machines are classes and in release mode they're structs).
-            if (causalityNodes.All(n => n.IsComplete || n.IsRoot && n.IsLeaf))
+            if (causalityNodes.All(n => n.IsComplete || n.IsRoot() && n.IsLeaf()))
             {
                 return false;
             }
 
-            var root = graph.Roots.FirstOrDefault()?.CausalityNodes.FirstOrDefault();
-            Contract.AssertNotNull(root);
-
-            if (root is TaskNode taskNode && taskNode.TaskKind == TaskKind.FromTaskCompletionSource)
+            if (graph.VisualNodes.Count == 1)
             {
-                // This is just a stand alone task completion source that is represented by two nodes: Task + TaskCompletionSource.
-                return false;
+                // Checking for a stand alone task completion source that is represented by two nodes: Task + TaskCompletionSource.
+                var root = graph.VisualNodes[0].CausalityNodes.FirstOrDefault();
+
+                if (root is TaskNode taskNode && taskNode.TaskKind == TaskKind.FromTaskCompletionSource)
+                {
+                    
+                    return false;
+                }
+
             }
 
             return true;
-        }
-
-        public IEnumerable<VisualNode> EnumerateVisualNodes()
-        {
-            foreach(var graph in _uniqueAsyncGraphs.Values)
-            {
-                foreach(var n in graph.EnumerateVisualNodes())
-                {
-                    yield return n;
-                }
-            }
         }
     }
 }
