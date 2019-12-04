@@ -75,12 +75,16 @@ namespace AsyncDbg.Core
             // 
             // 3. Async state machine for a local async method:
             // like: ManualResetEventSlimOnTheStack.Program+<<RunAsync>g__local|1_2>d
+            //
+            // 4. Move next methods
+            // like: AsyncReaderWriterLockDeadlock.Program+<Main>d__1.MoveNext()
 
-            var regex = new Regex(@"(?<typeName>[^+]+)\+.*?<(?<method>\w+)>(?<suffix>.+)");
+            var regex = new Regex(@"(?<typeName>[^+]+)\+.*?<(?<asyncMethod>\w+)>(?<suffix>[^\.]+)(?<method>\.\w+\(.*?\))?");
             var match = regex.Match(originalTypeName);
             if (match.Success)
             {
                 var typeName = match.Groups["typeName"].Value;
+                var asyncMethod = match.Groups["asyncMethod"].Value;
                 var method = match.Groups["method"].Value;
                 var suffix = match.Groups["suffix"].Value;
 
@@ -100,7 +104,7 @@ namespace AsyncDbg.Core
                     _ => suffix,
                 };
 
-                var result = $"{typeName}.{method}";
+                var result = $"{typeName}.{asyncMethod}{method}";
                 if (localName != null)
                 {
                     result += "." + localName;
