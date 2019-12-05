@@ -77,9 +77,9 @@ namespace AsyncDbg.Core
             // like: ManualResetEventSlimOnTheStack.Program+<<RunAsync>g__local|1_2>d
             //
             // 4. Move next methods
-            // like: AsyncReaderWriterLockDeadlock.Program+<Main>d__1.MoveNext()
+            // like: AsyncReaderWriterLockDeadlock.Program+<Main>d__1.MoveNext
 
-            var regex = new Regex(@"(?<typeName>[^+]+)\+.*?<(?<asyncMethod>\w+)>(?<suffix>[^\.]+)(?<method>\.\w+\(.*?\))?");
+            var regex = new Regex(@"(?<typeName>[^+]+)\+.*?<(?<asyncMethod>\w+)>(?<suffix>[^\.]+)(?<method>\.\w+)?");
             var match = regex.Match(originalTypeName);
             if (match.Success)
             {

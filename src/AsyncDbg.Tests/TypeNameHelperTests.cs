@@ -13,7 +13,7 @@ namespace Test.AsyncCausalityInspector
     public class TypeNameHelperTests
     {
         [TestCase("ManualResetEventSlimOnTheStack.Program+<RunAsync>d__1", "ManualResetEventSlimOnTheStack.Program.RunAsync")]
-        [TestCase("AsyncReaderWriterLockDeadlock.Program+<Main>d__1.MoveNext()", "AsyncReaderWriterLockDeadlock.Program.Main.MoveNext()")]
+        [TestCase("AsyncReaderWriterLockDeadlock.Program+<Main>d__1.MoveNext", "AsyncReaderWriterLockDeadlock.Program.Main.MoveNext")]
         [TestCase("ManualResetEventSlimOnTheStack.Program+<>c+<<RunAsync>b__1_0>d", "ManualResetEventSlimOnTheStack.Program.RunAsync.staticLambda1")]
         [TestCase("ManualResetEventSlimOnTheStack.Program+<>c+<<RunAsync>b__2_1>d", "ManualResetEventSlimOnTheStack.Program.RunAsync.staticLambda2")]
         [TestCase("WaitingOnTaskCompletionSource.Program+<>c__DisplayClass1_0.<<SetCompletion>b__0>d", "WaitingOnTaskCompletionSource.Program.SetCompletion.instanceLambda0")]

@@ -83,20 +83,11 @@ namespace AsyncDbg.VisuaNodes
             // Prepopulating CausalityNode -> VisualNode map.
             var collapseable = new List<ICausalityNode>();
             var visualNodes = new List<VisualNode>();
-            var allNodes = nodes;
-
-            // If we have a root node, we'll start from it, because in this case the node simplification will produce
-            // better result.
-            var root = nodes.FirstOrDefault(n => n.IsRoot());
-
-            if (root != null)
-            {
-                allNodes = root.EnumerateNeighborsAndSelfDepthFirst().ToList();
-            }
 
             var map = new Dictionary<ICausalityNode, VisualNode>();
             ICausalityNode? previousNode = null;
-            foreach (var node in allNodes)
+
+            foreach (var node in CausalityNodeExtensions.EnumerateNodesInCollapseableOrder(nodes))
             {
                 if (collapseable.Count != 0 && shouldCollapse(previousNode, node))
                 {
@@ -153,6 +144,12 @@ namespace AsyncDbg.VisuaNodes
 
             static bool shouldCollapse(ICausalityNode? previousNode, ICausalityNode node)
             {
+                if (!isCollapseable(previousNode, node))
+                {
+                    // If the current node is not collapseable, then the we should collapse the currenttly accumulated items.
+                    return true;
+                }
+
                 var shouldCollapse = node.Dependencies.Count > 1 || node.Dependents.Count > 1
                     || previousNode != null && !previousNode.Dependencies.Contains(node);
                 return shouldCollapse;
