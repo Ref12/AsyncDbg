@@ -53,6 +53,7 @@ namespace AsyncDbg.Causality
                 NodeKind.Thread => new ThreadNode(context, clrInstance),
                 NodeKind.ManualResetEventSlim => new ManualResetEventSlimNode(context, clrInstance),
                 NodeKind.SemaphoreSlim => new SemaphoreSlimNode(context, clrInstance),
+                NodeKind.SynchronizationContext => new SynchronizationContextNode(context, clrInstance),
                 _ => Return(() => new CausalityNode(context, clrInstance, kind)),
             };
         }

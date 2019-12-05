@@ -22,12 +22,6 @@ namespace AsyncDbg.Causality
         public ClrInstance? ContinuationObject => ContinuationResolver.TryResolveContinuationForAction(ClrInstance["m_action"].Instance, Context);
 
         /// <summary>
-        /// Returns true if the current instance is SynchronizationContextAwaitTaskContinuation instance.
-        /// We can check this by looking into the field m_syncContext.
-        /// </summary>
-        public bool IsSyncContextAware => SyncContext != null;
-
-        /// <summary>
         /// Returns <see cref="System.Threading.SynchronizationContext"/> instance if awailable.
         /// </summary>
         public ClrInstance? SyncContext => ClrInstance.TryGetFieldValue("m_syncContext")?.Instance;
@@ -46,21 +40,9 @@ namespace AsyncDbg.Causality
                 AddDependent(continuation);
             }
 
-            // Now we can do the following trick and explore the sync context.
-            // Maybe it has some fields that are relevant for us. For instance, AsyncReaderWriterLock uses a sync context to limit the concurrency
-            // so the sync context points to a semaphore slim.
-
             if (SyncContext != null)
             {
-                foreach (var f in SyncContext.Fields)
-                {
-                    if (Context.TryGetNodeFor(f.Instance, out var dependency))
-                    {
-                        // TODO: maybe add a name for the link, something like 'from SyncContext'.
-                        // TODO: another option is to add sync context as a separate node here!
-                        AddDependency(dependency);
-                    }
-                }
+                AddDependency(SyncContext);
             }
         }
 
@@ -68,11 +50,6 @@ namespace AsyncDbg.Causality
         protected override string ToStringCore()
         {
             var result = base.ToStringCore();
-
-            if (SyncContext != null)
-            {
-                result += $"{Environment.NewLine}(with sync context: {SyncContext.Type?.TypeToString(Context.Registry)})";
-            }
 
             return result;
         }

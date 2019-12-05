@@ -29,6 +29,8 @@ namespace AsyncDbg
         private readonly ClrType _unwrapPromise;
 
         public TypeIndex TaskIndex { get; }
+        public TypeIndex SynchronizationContextIndex { get; }
+
         public TypeIndex ValueTaskIndex { get; }
         public TypeIndex ManualResetEventIndex { get; }
         public TypeIndex ManualResetEventSlimIndex { get; }
@@ -59,6 +61,7 @@ namespace AsyncDbg
 
             TaskIndex = CreateTypeIndex(NodeKind.Task);
             ValueTaskIndex = CreateTypeIndex(NodeKind.ValueTask, isOptional: true); // value task types can be missing depending on framework version.
+            SynchronizationContextIndex = CreateTypeIndex(NodeKind.SynchronizationContext);
             ManualResetEventSlimIndex = CreateTypeIndex(NodeKind.ManualResetEventSlim);
             ManualResetEventIndex = CreateTypeIndex(NodeKind.ManualResetEvent);
             AwaitTaskContinuationIndex = CreateTypeIndex(NodeKind.AwaitTaskContinuation);
@@ -260,6 +263,7 @@ namespace AsyncDbg
                 NodeKind.BlockingObject => throw new NotSupportedException(), // todoc
                 NodeKind.TaskCompletionSource => GetClrTypeFor(typeof(TaskCompletionSource<>)),
                 NodeKind.AsyncStateMachine => GetClrTypeByFullName("System.Runtime.CompilerServices.IAsyncStateMachine"),
+                NodeKind.SynchronizationContext => GetClrTypeByFullName("System.Threading.SynchronizationContext"),
                 _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
             };
 

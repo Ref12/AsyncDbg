@@ -137,8 +137,6 @@ namespace AsyncDbg.Causality
         /// <inheritdoc />
         public override void Link()
         {
-            base.Link();
-
             foreach ((CausalityNode node, string method) in GetCausalityNodesOnTheStack())
             {
                 switch (node, method)

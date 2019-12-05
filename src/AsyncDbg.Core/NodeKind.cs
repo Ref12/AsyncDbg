@@ -14,6 +14,8 @@
         SemaphoreSlim,
         Thread,
 
+        SynchronizationContext,
+
         // Blocking objects must be processed after threads
         BlockingObject,
         TaskCompletionSource,
