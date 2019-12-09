@@ -1,5 +1,5 @@
 ﻿using AsyncDbg.Core;
-using System;
+using System.Linq;
 
 #nullable enable
 
@@ -32,11 +32,19 @@ namespace AsyncDbg.Causality
             var continuation = ContinuationObject;
 
             // Establishing the edge like: 'async state machine -> await task continuation',
-            // because the conituation usually points to MoveNextRunner that moves a given state machine forward.
 
             if (continuation != null)
             {
                 // TODO: maybe add a name of the link: like 'Runs IAsyncStateMachine.MoveNext'
+                if (Context.TryGetNodeFor(continuation, out var continuationNode))
+                {
+                    if (continuationNode is AsyncStateMachineNode asm)
+                    {
+                        // Setting a sync context to make display string more descriptive.
+                        asm.SetSyncContext(SyncContext);
+                    }
+                }
+
                 AddDependent(continuation);
             }
 
@@ -47,11 +55,26 @@ namespace AsyncDbg.Causality
         }
 
         /// <inheritdoc />
-        protected override string ToStringCore()
+        public override void Simplify()
         {
-            var result = base.ToStringCore();
-
-            return result;
+            var awaitNode = Dependents.OfType<AsyncStateMachineNode>().FirstOrDefault();
+            if (awaitNode != null && awaitNode.AwaitedTaskNode?.Status == System.Threading.Tasks.TaskStatus.WaitingForActivation)
+            {
+                // This is a very specific case, but it simplifies the final graph a lot.
+                // In async method invocation chain, every async method has a dependency to SyncContextAwaitTaskContinuation
+                // because every step of async method (if not decorated with ConfigureAwait(false)) is called
+                // on a captured sync context.
+                // When every async method in the chain is in awaiting state, and the awaited task is indeed in an awaited state
+                // then we can remove this node from the graph to make it clearer.
+                //
+                // (Yes, it is possible that the state machine is in awaited state but the awaited task is completed.
+                // This is the main case when the deadlock caused by the sync over async is happening).
+                var syncContextAwaitTaskContinuation = awaitNode.Dependencies.OfType<AwaitTaskContinuationNode>().FirstOrDefault();
+                if (syncContextAwaitTaskContinuation != null)
+                {
+                    //RemoveThisNode();
+                }
+            }
         }
     }
 }

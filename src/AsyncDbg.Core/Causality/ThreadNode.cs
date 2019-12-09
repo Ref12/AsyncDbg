@@ -37,6 +37,7 @@ namespace AsyncDbg.Causality
 
             if (_clrThread != null)
             {
+                System.Console.WriteLine($"Analyzing stack for thread '{_clrThread.ManagedThreadId}'");
                 _enhancedStackTrace = EnhancedStackTrace.Create(_clrThread.StackTrace, context.Registry);
                 PopulateCausalityNodesOnStack(_clrThread);
             }
@@ -76,10 +77,7 @@ namespace AsyncDbg.Causality
                     }
 
                     ClrType type = _runtime.Heap.GetObjectType(address);
-
-                    // Expected type can be a base type or an interface.
-                    // So we need to check if the curren
-                    if (type.EnumerateBaseTypesAndSelf().Contains(expectedType))
+                    if (ClrTypeEqualityComparer.Instance.Equals(expectedType, type))
                     {
                         return ClrInstance.CreateInstance(_runtime.Heap, address, type);
                     }
@@ -146,7 +144,7 @@ namespace AsyncDbg.Causality
                         AddEdge(this, sm);
                         break;
                     case (TaskCompletionSourceNode tcs, string m) when m.StartsWith("Set") || m.StartsWith("TrySet"):
-                        AddEdge(this, tcs);
+                        AddEdge(tcs, this);
                         break;
                     case ({ Kind: NodeKind.ManualResetEventSlim }, "Wait"):
                     case ({ Kind: NodeKind.ManualResetEvent }, "WaitOne"):
@@ -164,6 +162,25 @@ namespace AsyncDbg.Causality
 
                 }
             };
+        }
+
+        /// <inheritdoc />
+        public override void Simplify()
+        {
+            // In 'Link' method we added the links from the tread to all the state machines on the stack.
+            // But if in some cases the fact that the state machine is on the stack is obvious from the stack trace,
+            // and adding multiple edges from the tread to a bunch of state machines with 0 dependents is not helpful.
+            // The problem is especially visible when one thread runs many state machines that is happening frequently
+            // when running a bunch of sync parts of many async methods.
+            // Potentially we link the state machines in the right order, but not sure its worth it.
+
+            foreach ((CausalityNode node, string method) in GetCausalityNodesOnTheStack())
+            {
+                if (node is AsyncStateMachineNode && method == "MoveNext")
+                {
+                    RemoveEdge(node);
+                }
+            }
         }
 
         private IEnumerable<(CausalityNode node, string method)> GetCausalityNodesOnTheStack()

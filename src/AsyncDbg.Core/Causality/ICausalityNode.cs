@@ -13,6 +13,7 @@ namespace AsyncDbg.Causality
         HashSet<ICausalityNode> Dependencies { get; }
 
         HashSet<ICausalityNode> Dependents { get; }
+
+        void RemoveEdge(ICausalityNode node, bool removeFromOther = true);
     }
-    
 }

@@ -188,13 +188,31 @@ namespace AsyncDbg.Causality
                 // So we can grab m_action field and get a "method name" that was given to ContinueWith method.
                 // Is it possible to get a method name by the method pointer?
                 var action = ClrInstance["m_action"].Instance;
-                Contract.Assert(action.IsNotNull(), "m_action field must not be null.");
+                // Here is a comment in Task.cs
+                // internal object m_action;    
+                // The body of the task.  Might be Action<object>, Action<TState> or Action.  Or possibly a Func.
+                // If m_action is set to null it will indicate that we operate in the
+                // "externally triggered completion" mode, which is exclusively meant 
+                // for the signalling Task<TResult> (aka. promise). In this mode,
+                // we don't call InnerInvoke() in response to a Wait(), but simply wait on
+                // the completion event which will be set when the Future class calls Finish().
+                // But the event would now be signalled if Cancel() is called
+                if (action.IsNull)
+                {
+                    return "externally triggered completion mode";
+                }
 
                 var methodPtr = action["_methodPtr"].Instance;
 
                 var runtime = Context.Runtime;
                 var methodInfo = runtime.GetMethodByAddress((ulong)(long)methodPtr.Value);
+                if (methodInfo == null)
+                {
+                    methodPtr = action["_methodPtrAux"].Instance;
+                    methodInfo = runtime.GetMethodByAddress((ulong)(long)methodPtr.Value);
+                }
 
+                Contract.AssertNotNull(methodInfo, "Can't find method name for a delegate");
                 var signature = methodInfo.GetFullSignature();
                 return TypeNameHelper.TrySimplifyMethodSignature(signature);
             }

@@ -33,10 +33,12 @@ namespace AsyncCausalityDebugger
             //var dumpPath = args.Length > 0 ? args[0] : @"E:\Dumps\FromDmitry\BatmonService-MW1AAPE3AE9F979-27484-55d99747-c1fe-d35b-d6b0-ae122faa04a9.dmp";
             //var dumpPath = args.Length > 0 ? args[0] : @"C:\Users\seteplia\AppData\Local\Temp\BasicDatastructures.DMP";
             //var dumpPath = args.Length > 0 ? args[0] : @"C:\Sources\GitHub\Dumps4AsyncDbg\AsyncReaderWriterLockDeadlock_64.DMP";
-            //var dumpPath = args.Length > 0 ? args[0] : @"C:\Sources\GitHub\Dumps4AsyncDbg\LongRunningTask_64.DMP";
-            //var dumpPath = args.Length > 0 ? args[0] : @"C:\Sources\GitHub\Dumps4AsyncDbg\WaitingOnTaskCompletionSource_64.DMP";
-            var dumpPath = args.Length > 0 ? args[0] : @"C:\Sources\GitHub\Dumps4AsyncDbg\";
-            // "C:\Sources\GitHub\Dumps4AsyncDbg\SemaphoreSlimWrapper_64.DMP"
+
+            var dumpPath = args.Length > 0 ? args[0] : @"C:\Sources\GitHub\Dumps4AsyncDbg\AsyncReaderWriterLockDeadLockWithSyncContext_64.DMP";
+            //var dumpPath = args.Length > 0 ? args[0] : @"C:\Sources\GitHub\Dumps4AsyncDbg\BlockingTaskCompletionSourcesContinuation_64.DMP";
+
+            //var dumpPath = args.Length > 0 ? args[0] : @"C:\Sources\GitHub\Dumps4AsyncDbg\RealDumps\1_xunit.console.exe.dmp";
+
             //var dumpPath = args.Length > 0 ? args[0] : @"C:\Sources\GitHub\Dumps4AsyncDbg\ManualResetEventSlimOnTheStack_64.DMP";
             //var dumpPath = args.Length > 0 ? args[0] : @"E:\Dumps\UnhandledFailure (2)\UnhandledFailure.dmp";
             //var dumpPath = args.Length > 0 ? args[0] : @"E:\Dumps\QCacheService.exe_190425_034613\QCacheService.exe_190425_034613.dmp";

@@ -102,6 +102,11 @@ namespace AsyncDbg.Causality
             {
                 node.Link();
             }
+
+            foreach (var node in _nodesByAddress.Values)
+            {
+                node.Simplify();
+            }
         }
 
         public string OverallStats(string filePath)
@@ -161,7 +166,7 @@ namespace AsyncDbg.Causality
             var writer = new DgmlWriter();
 
             Console.WriteLine("Analyzing the async graphs...");
-            var visualContext = VisuaNodes.VisualContext.Create(Nodes, simplify: false);
+            var visualContext = VisuaNodes.VisualContext.Create(Nodes, simplify: true);
 
             foreach (var node in visualContext.EnumerateVisualNodes())
             {

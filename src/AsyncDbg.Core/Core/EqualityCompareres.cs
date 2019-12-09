@@ -26,11 +26,12 @@ namespace AsyncDbg.Core
         }
     }
 
-    internal class ClrTypeEqualityComparer : EqualityComparer<ClrType?>
+    public class ClrTypeEqualityComparer : EqualityComparer<ClrType?>
     {
         public static readonly ClrTypeEqualityComparer Instance = new ClrTypeEqualityComparer();
         public override bool Equals(ClrType? x, ClrType? y)
         {
+            // type.EnumerateBaseTypesAndSelf().Contains(expectedType)
             return (x?.MetadataToken == y?.MetadataToken || x?.Name == y?.Name) && x?.Module.FileName == y?.Module.FileName;
         }
 

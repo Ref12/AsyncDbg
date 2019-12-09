@@ -1,5 +1,6 @@
 ﻿using AsyncDbg.Core;
 using System;
+using System.Linq;
 
 #nullable enable
 
@@ -34,6 +35,7 @@ namespace AsyncDbg.Causality
 
         // A task that the current state machine instance awaits on
         private readonly ClrInstance? _awaitedTask;
+        private ClrInstance? _syncContext;
 
         private readonly StateMachineStatus _status;
 
@@ -60,6 +62,11 @@ namespace AsyncDbg.Causality
             _resultingTask = GetResultingTask(clrInstance, Context.Registry);
         }
 
+        public void SetSyncContext(ClrInstance? syncContext)
+        {
+            _syncContext = syncContext;
+        }
+
         /// <inheritdoc />
         public override bool IsComplete => Status == StateMachineStatus.Completed;
 
@@ -84,7 +91,7 @@ namespace AsyncDbg.Causality
         // The result actually can be null, when not all the nodes are registered.
         // For instance, accessing this property from constructor may return null.
         // Maybe assert that Context.Linked is true or something similar?
-        public TaskNode ResultingTaskNode => (TaskNode)TryGetCausalityNodeFor(_resultingTask)!;
+        public TaskNode? ResultingTaskNode => (TaskNode)TryGetCausalityNodeFor(_resultingTask)!;
 
         public StateMachineStatus Status =>
             StateMachineState switch
@@ -196,9 +203,13 @@ namespace AsyncDbg.Causality
             var insAndOuts = InsAndOuts(Dependencies.Count, Dependents.Count);
 
             //var type = _underlyingTask?.ClrInstance.Type != null ? $"{_underlyingTask.ClrInstance.Type?.TypeToString(Types)} " : string.Empty;
-            string type = _resultingTask.Type != null && !_resultingTask.IsNull ? $"{_resultingTask.Type?.TypeToString(Context.Registry)}" : "void";
+            string type = _resultingTask.Type != null ? $"{_resultingTask.Type?.TypeToString(Context.Registry)}" : "void";
             var result = $"{insAndOuts} {statusText}async {type} {ClrInstance.Type?.TypeToString(Context.Registry)}() ({ClrInstance.ObjectAddress})";
 
+            if (_syncContext != null)
+            {
+                result += Environment.NewLine + $"with sync context '{_syncContext.Type}'";
+            }
             return result;
         }
     }

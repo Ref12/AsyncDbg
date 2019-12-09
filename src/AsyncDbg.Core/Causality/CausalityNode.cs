@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using AsyncDbg.Core;
 
 #nullable enable
@@ -95,7 +96,18 @@ namespace AsyncDbg.Causality
             return $"{prefix} {mainText} {suffix}";
         }
 
+        /// <summary>
+        /// Link a current node with other causality nodes.
+        /// </summary>
         public virtual void Link()
+        {
+
+        }
+
+        /// <summary>
+        /// "Unlink" some causality chains to simplify the final diagram
+        /// </summary>
+        public virtual void Simplify()
         {
 
         }
@@ -137,6 +149,26 @@ namespace AsyncDbg.Causality
             dependency.Dependents.Add(dependent);
             dependent.Dependencies.Add(dependency);
             return true;
+        }
+
+        protected void RemoveEdge(ICausalityNode node, bool removeFromOther = true) => ((ICausalityNode)(this)).RemoveEdge(node, removeFromOther);
+
+        void ICausalityNode.RemoveEdge(ICausalityNode node, bool removeFromOther)
+        {
+            Dependencies.Remove(node);
+            Dependents.Remove(node);
+
+            if (removeFromOther)
+            {
+                node.RemoveEdge(this, removeFromOther: false);
+            }
+        }
+
+        protected void RemoveThisNode()
+        {
+            foreach (var d in Dependencies.ToList()) { RemoveEdge(d); }
+
+            foreach (var d in Dependents.ToList()) { RemoveEdge(d); }
         }
 
         /// <inheritdoc />
